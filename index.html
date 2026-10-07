@@ -86,7 +86,13 @@ input[type=text],input[type=number],select{width:100%;min-height:48px;border-rad
 .ck.on{background:var(--ok);border-color:var(--ok);color:#fff}
 .row.s-ok,.row.s-c,.row.s-v{margin:2px -6px;padding:4px 6px;width:calc(100% + 12px);border-radius:12px;border-bottom-color:transparent}
 .row.s-ok{background:var(--gbg)}.row.s-c{background:var(--ybg)}.row.s-v{background:var(--sec);opacity:.55;filter:grayscale(1)}
-@media print{body *{visibility:hidden}#receipt,#receipt *{visibility:visible}#ov{position:absolute;background:none;display:block}.sh{position:static;transform:none;max-height:none;overflow:visible;background:#fff;color:#000;padding:0}#receipt{position:absolute;left:0;top:0;width:100%;color:#000}}
+@page{margin:0}
+#prn{position:absolute;left:-9999px;top:0;visibility:hidden;width:48mm;padding:3mm 0 6mm;font-size:11px;line-height:1.35;color:#000;background:#fff;text-align:center}
+#prn *{color:#000!important;border-color:#000!important}
+#prn .ok,#prn h2{display:none!important}
+#prn img{width:16mm!important;height:16mm!important;filter:grayscale(1) contrast(1.6)}
+#prn .l{display:flex;justify-content:space-between;text-align:left;padding:2px 0}
+@media print{html,body{height:auto!important;background:#fff!important;overflow:visible!important}#app,#ov,#toast{display:none!important}#prn{position:static;visibility:visible;margin:0 auto}}
 </style>
 </head>
 <body>
@@ -121,12 +127,12 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 
 /* ============ STORAGE ============ */
 const LS={get:(k,d)=>{try{const v=localStorage.getItem('bb_'+k);return v==null?d:JSON.parse(v)}catch{return d}},set:(k,v)=>{try{localStorage.setItem('bb_'+k,JSON.stringify(v))}catch{}}};
-const DEF={shop:'ORAS Coffee',logo:'',cur:'₱',rShop:true,rNo:true,rPay:true,dark:false,pin:''};
+const DEF={shop:'ORAS Coffee',logo:'',logoL:'',logoD:'',cur:'₱',rShop:true,rNo:true,rPay:true,dark:false,pin:''};
 
 /* ============ STATE ============ */
 let S={
   products:LS.get('products',null)||SEED.map((s,i)=>({id:'p'+i,cat:s[0],name:s[1],price:s[2],desc:s[3],em:s[4],on:true})),
-  orders:LS.get('orders',[]),opts:LS.get('opts',null)||clone(OPT),cats:LS.get('cats',null)||clone(DEFCATS),settings:{...DEF,...LS.get('settings',{})},
+  orders:LS.get('orders',[]),opts:LS.get('opts',null)||clone(OPT),cats:LS.get('cats',null)||clone(DEFCATS),settings:(()=>{const x={...DEF,...LS.get('settings',{})};if(x.logo){x.logoL=x.logoL||x.logo;x.logo=''}return x})(),
   cart:LS.get('cart',{items:[],dc:null}),discounts:LS.get('discounts',null)||[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}],next:LS.get('next',1001),
   view:'pos',sub:null,cat:'Coffee',cur:null,pay:{m:'Cash',r:''}
 };
@@ -158,7 +164,7 @@ const count=c=>c.items.reduce((a,i)=>a+i.qty,0);
 let tt;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),1600)}
 
 /* ============ MODALS ============ */
-function sheet(html,dlg){const o=$('#ov'),s=$('#sh'),first=!o.classList.contains('show');$('#toast').classList.remove('on');s.className='sh'+(dlg?' dlg':'');s.innerHTML=(dlg?'':'<div class="grab"></div><button class="ib cl" data-a="close" aria-label="Close">✕</button>')+html;if(!o.classList.contains('show')){o.classList.add('show');requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('open')))}const f=s.querySelector('[autofocus]');if(f)f.focus();else if(first)s.focus()}
+function sheet(html,dlg){const o=$('#ov'),s=$('#sh'),first=!o.classList.contains('open');$('#toast').classList.remove('on');s.className='sh'+(dlg?' dlg':'');s.innerHTML=(dlg?'':'<div class="grab"></div><button class="ib cl" data-a="close" aria-label="Close">✕</button>')+html;if(!o.classList.contains('open')){o.classList.add('show');requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('open')))}const f=s.querySelector('[autofocus]');if(f)f.focus();else if(first)s.focus()}
 function closeSheet(){const o=$('#ov');o.classList.remove('open');setTimeout(()=>{if(!o.classList.contains('open'))o.classList.remove('show')},200);S.cur=null;PF=null;PIN=null}
 function confirmDlg(msg,fn,label='Confirm',keep='Cancel'){window._cf=fn;sheet(`<h2 style="font-size:19px">${esc(msg)}</h2><div style="display:flex;gap:8px;margin-top:16px"><button class="btn sec" data-a="close">${keep}</button><button class="btn bad" data-a="cfok">${label}</button></div>`,1)}
 $('#ov').addEventListener('click',e=>{if(e.target.id==='ov')closeSheet()});
@@ -167,7 +173,7 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();if(e.ke
 /* ============ RENDER ============ */
 function render(){
   document.documentElement.dataset.theme=S.settings.dark?'dark':'light';document.querySelector('meta[name=theme-color]').content=S.settings.dark?'#1c1b19':'#6F4E37';
-  $('#shopn').textContent=S.settings.shop;const lg=$('#logo');if(S.settings.logo){lg.src=S.settings.logo;lg.hidden=false}else lg.hidden=true;$('#ono').textContent='#'+S.next;
+  $('#shopn').textContent=S.settings.shop;const lg=$('#logo'),lsrc=logoFor(S.settings.dark);if(lsrc){lg.src=lsrc;lg.hidden=false}else lg.hidden=true;$('#ono').textContent='#'+S.next;
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
   const m=$('#main');
   m.innerHTML=({pos:vPos,orders:vOrders,dash:vDash,more:vMore})[S.view]();
@@ -201,7 +207,7 @@ function vMore(){
   if(S.sub==='products')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Products</h2><button class="btn sm" data-a="editp" data-id="">+ Add</button></div><div class="lst" style="margin-top:14px">${S.products.map(p=>`<div class="row"><button class="g" style="text-align:left" data-a="editp" data-id="${p.id}"><b>${p.em||''} ${esc(p.name)}</b><small>${esc(p.cat)} · ${fmt(p.price)}${p.on?'':' · Unavailable'}</small></button><button class="ib" data-a="tog" data-id="${p.id}" aria-label="Toggle availability">${p.on?'✅':'⛔'}</button></div>`).join('')}</div>`;
   if(S.sub==='settings'){const sw=(k,t)=>`<label class="sw" style="margin:0;color:var(--tx);font-size:16px">${t}<input type="checkbox" data-s="${k}" ${s[k]?'checked':''}></label>`;
     return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0">Settings</h2></div>
-    <h3>Shop</h3><label for="s1">Shop name</label><input type="text" id="s1" data-s="shop" value="${esc(s.shop)}"><label>Logo</label><div style="display:flex;align-items:center;gap:12px"><div style="width:64px;height:64px;border-radius:14px;background:var(--sec);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none">${s.logo?`<img src="${s.logo}" alt="Shop logo" style="width:100%;height:100%;object-fit:cover">`:'☕'}</div><button class="btn sec sm" data-a="pickLogo">${s.logo?'Change':'Upload'} logo</button>${s.logo?'<button class="btn sec sm" data-a="rmLogo">Remove</button>':''}<input type="file" id="lg" accept="image/*" data-a2="logo" hidden></div><label for="s2">Currency symbol</label><input type="text" id="s2" data-s="cur" value="${esc(s.cur)}" maxlength="3">
+    <h3>Shop</h3><label for="s1">Shop name</label><input type="text" id="s1" data-s="shop" value="${esc(s.shop)}"><div style="display:grid;gap:12px;margin-top:6px">${logoBox('L','Logo · light mode','#F8F7F4')}${logoBox('D','Logo · dark mode','#1c1b19')}</div><p style="color:var(--mut);font-size:13px;margin:8px 0 0">Shown in the header. With only one uploaded, it's used for both modes. Receipts print the light logo.</p><label for="s2">Currency symbol</label><input type="text" id="s2" data-s="cur" value="${esc(s.cur)}" maxlength="3">
     <h3>Receipt</h3>${sw('rShop','Show shop name')}${sw('rNo','Show order number')}${sw('rPay','Show payment method')}
     <h3>Appearance</h3>${sw('dark','Dark mode')}
     <h3>Security</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="setpin">${s.pin?'Change void passcode':'Set void passcode'}</button>${s.pin?'<button class="btn sec" data-a="rmpin">Remove void passcode</button>':''}</div><small style="color:var(--mut);display:block;margin-top:6px">A 4-digit passcode is required to void an order or restore a voided one.</small>
@@ -273,7 +279,7 @@ function complete(){
 function showReceipt(o,fresh){
   const s=S.settings;
   sheet(`<div id="receipt">${fresh?'<div class="ok">✓</div><h2>Payment Complete</h2>':'<h2>Order details</h2>'+(o.voided?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Voided at '+tm(o.voided)+'</div>':o.void?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Cancelled at '+tm(o.void)+'</div>':o.done?'<div style="color:var(--ok);font-weight:700;margin-bottom:6px">Completed at '+tm(o.done)+'</div>':'')}
-  ${s.rShop&&s.logo?`<img src="${s.logo}" alt="" style="width:56px;height:56px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 6px">`:''}${s.rShop?`<div style="font-weight:700">${esc(s.shop)}</div>`:''}<div style="color:var(--mut);margin-bottom:10px">${s.rNo?'Order #'+o.no+' · ':''}${new Date(o.t).toLocaleDateString('en-PH')} ${tm(o.t)}${o.cust?`<br><span style="color:var(--tx)">Customer: <b>${esc(o.cust)}</b></span>`:''}</div>
+  ${s.rShop&&logoFor(s.dark)?`<img src="${logoFor(s.dark)}" alt="" style="width:56px;height:56px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 6px">`:''}${s.rShop?`<div style="font-weight:700">${esc(s.shop)}</div>`:''}<div style="color:var(--mut);margin-bottom:10px">${s.rNo?'Order #'+o.no+' · ':''}${new Date(o.t).toLocaleDateString('en-PH')} ${tm(o.t)}${o.cust?`<br><span style="color:var(--tx)">Customer: <b>${esc(o.cust)}</b></span>`:''}</div>
   <div style="border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd);padding:8px 0;margin-bottom:8px">${o.items.map(i=>`<div class="l"><span>${esc(i.name)} × ${i.qty}${i.opts.length?`<small style="display:block;color:var(--mut)">${esc(i.opts.join(', '))}</small>`:''}${i.dd?`<small style="display:block;color:var(--mut)">${esc(i.dn)} −${fmt(i.dd)}</small>`:''}</span><span>${fmt(i.unit*i.qty)}</span></div>`).join('')}</div>
   ${o.disc?`<div class="l"><span>Subtotal</span><span>${fmt(o.sub)}</span></div>`:''}${o.di?`<div class="l"><span>Item discounts</span><span>−${fmt(o.di)}</span></div>`:''}${(o.di===undefined?o.disc:o.dor)?`<div class="l"><span>${o.di===undefined?'Discount':'Order discount'}${o.dname?' ('+esc(o.dname)+')':''}</span><span>−${fmt(o.di===undefined?o.disc:o.dor)}</span></div>`:''}<div class="l" style="font-size:20px"><b>Total</b><b>${fmt(o.total)}</b></div>
   ${s.rPay?`<div class="l"><span>Payment</span><span>${o.method}</span></div>`:''}${o.method==='Cash'?`<div class="l"><span>Received</span><span>${fmt(o.recv)}</span></div><div class="l"><span>Change</span><span>${fmt(o.change)}</span></div>`:''}</div>
@@ -322,6 +328,8 @@ function askPin(title,cb){
   if(!S.settings.pin){toast('Set a void passcode in More → Settings first');return}
   pinPad(title,'Enter passcode',c=>{if(!chk(c))return false;closeSheet();cb()});
 }
+/* destructive actions ask for the passcode when one is set */
+function guard(title,cb){S.settings.pin?askPin(title,cb):cb()}
 function newPin(){
   pinPad('New passcode','Choose 4 digits',c1=>{pinPad('Confirm passcode','Enter it again',c2=>{if(c1!==c2){toast("Passcodes don't match");return false}S.settings.pin=hp(c2);persist('settings');closeSheet();render();toast('Passcode saved')})});
 }
@@ -347,7 +355,13 @@ const A={
   key:d=>{let r=S.pay.r;if(d.v==='⌫')r=r.slice(0,-1);else if(r.length<7)r=(r+d.v).replace(/^0+(?=\d)/,'');S.pay.r=r;drawPay()},
   done:complete,
   newo:()=>{closeSheet();S.view='pos';render()},
-  print:()=>window.print(),
+  print:()=>{const r=$('#receipt');if(!r)return window.print();
+    let n=$('#prn');if(!n){n=document.createElement('div');n.id='prn';document.body.appendChild(n)}
+    n.innerHTML=r.innerHTML;const pl=logoFor(false);n.querySelectorAll('img').forEach(i=>{if(pl)i.src=pl});
+    const mm=Math.ceil(n.getBoundingClientRect().height*25.4/96)+2;
+    let st=$('#pgsz');if(!st){st=document.createElement('style');st.id='pgsz';document.head.appendChild(st)}
+    st.textContent='@page{size:58mm '+mm+'mm;margin:0}';
+    window.print()},
   install:()=>{if(!IP)return;const e=IP;e.prompt();e.userChoice.finally(()=>{IP=null;if(S.view==='more'&&!S.sub)render()})},
   void:d=>{const o=S.orders.find(x=>x.no==d.id);confirmDlg(`Cancel order #${o.no}? It will be removed from today's sales.`,()=>{o.void=Date.now();persist('orders');render();toast('Order cancelled')},'Cancel order','Keep order')},
   unvoid:d=>{const o=S.orders.find(x=>x.no==d.id);delete o.void;persist('orders');render();showReceipt(o);toast('Order restored')},
@@ -363,8 +377,8 @@ const A={
   editp:d=>editProd(d.id),savep:saveProd,
   tog:d=>{const p=S.products.find(x=>x.id===d.id);p.on=!p.on;persist('products');render()},
   delp:d=>confirmDlg('Delete this product?',()=>{S.products=S.products.filter(p=>p.id!==d.id);persist('products');render();toast('Product deleted')},'Delete'),
-  pickLogo:()=>$('#lg').click(),
-  rmLogo:()=>{S.settings.logo='';persist('settings');render();toast('Logo removed')},
+  pickLogo:d=>$('#lg'+d.k).click(),
+  rmLogo:d=>{S.settings['logo'+d.k]='';persist('settings');render();toast('Logo removed')},
   oAdd:d=>{if(d.sc==='p')syncPF();oArr(d.sc,d.g).push(['New',0]);oDone(d.sc)},
   oDel:d=>{if(d.sc==='p')syncPF();oArr(d.sc,d.g).splice(+d.i,1);oDone(d.sc)},
   cg:d=>{const c=S.cats[d.x],k=c.g.indexOf(d.g);k<0?c.g.push(d.g):c.g.splice(k,1);persist('cats');render()},
@@ -374,8 +388,8 @@ const A={
   dadd:()=>{S.discounts.push({id:'d'+Date.now(),name:'New discount',type:'pct',v:10,scope:'both'});persist('discounts');render()},
   ddel:d=>{const x=S.discounts[d.x];confirmDlg(`Delete "${x.name}"?`,()=>{S.discounts.splice(d.x,1);persist('discounts');render()},'Delete')},
   export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined}},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
-  clr:()=>confirmDlg('Clear all orders? This cannot be undone.',()=>{S.orders=[];persist('orders');render();toast('Orders cleared')},'Clear'),
-  reset:()=>confirmDlg('Reset the POS? Products, orders and settings will be erased.',()=>{Object.keys(localStorage).filter(k=>k.startsWith('bb_')).forEach(k=>localStorage.removeItem(k));location.reload()},'Reset')
+  clr:()=>confirmDlg('Clear all orders? This cannot be undone.',()=>guard('Clear all orders',()=>{S.orders=[];persist('orders');render();toast('Orders cleared')}),'Clear'),
+  reset:()=>confirmDlg('Reset the POS? Products, orders and settings will be erased.',()=>guard('Reset POS',()=>{Object.keys(localStorage).filter(k=>k.startsWith('bb_')).forEach(k=>localStorage.removeItem(k));location.reload()}),'Reset')
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a])A[t.dataset.a](t.dataset)});
 document.addEventListener('change',e=>{
@@ -385,7 +399,7 @@ document.addEventListener('change',e=>{
   if(t.dataset.cn!=null){const c=S.cats[+t.dataset.cn],v=t.value.trim();if(!v||S.cats.some(x=>x!==c&&x.n.toLowerCase()===v.toLowerCase())){toast('Name is empty or already used');render();return}S.products.forEach(q=>{if(q.cat===c.n)q.cat=v});if(S.cat===c.n)S.cat=v;c.n=v;persist('cats');persist('products')}
   if(t.id==='f2'&&PF){syncPF();drawPF()}
   if(t.id==='f6'&&PF){syncPF();PF.o=t.checked?{}:null;drawPF()}
-  if(t.dataset.a2==='logo')setLogo(t.files[0]);
+  if(t.dataset.a2==='logoL'||t.dataset.a2==='logoD')setLogo(t.files[0],t.dataset.a2.slice(4));
   if(t.dataset.a2==='ldisc'){S.cart.items[+t.dataset.x].dc=t.value||null;persist('cart');drawCart();renderBar()}
   if(t.dataset.a2==='disc'){S.cart.dc=t.value||null;persist('cart');drawCart();renderBar()}
   if(t.dataset.s){const k=t.dataset.s;S.settings[k]=t.type==='checkbox'?t.checked:(t.value.trim()||DEF[k]);persist('settings');render()}
@@ -398,12 +412,14 @@ document.addEventListener('change',e=>{
   document.addEventListener('click',e=>{if(moved&&e.target.closest('.tabs')){e.stopPropagation();e.preventDefault()}moved=0},true);
   document.addEventListener('wheel',e=>{const el=e.target.closest('.tabs');if(el&&el.scrollWidth>el.clientWidth&&Math.abs(e.deltaY)>Math.abs(e.deltaX)){el.scrollLeft+=e.deltaY;e.preventDefault()}},{passive:false});
 })();
-function setLogo(f){
+const logoFor=dark=>dark?(S.settings.logoD||S.settings.logoL):(S.settings.logoL||S.settings.logoD);
+const logoBox=(k,title,bg)=>{const v=S.settings['logo'+k];return `<div><label style="margin-top:0">${title}</label><div style="display:flex;align-items:center;gap:12px"><div style="width:64px;height:64px;border-radius:14px;background:${bg};border:1px solid var(--bd);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none">${v?`<img src="${v}" alt="${title}" style="width:100%;height:100%;object-fit:cover">`:'<span style="opacity:.45">☕</span>'}</div><button class="btn sec sm" data-a="pickLogo" data-k="${k}">${v?'Change':'Upload'}</button>${v?`<button class="btn sec sm" data-a="rmLogo" data-k="${k}">Remove</button>`:''}<input type="file" id="lg${k}" accept="image/*" data-a2="logo${k}" hidden></div></div>`};
+function setLogo(f,k){
   if(!f)return;const rd=new FileReader();
   rd.onload=()=>{const im=new Image();
     im.onload=()=>{const n=256,c=document.createElement('canvas');c.width=c.height=n;const m=Math.min(im.width,im.height);
       c.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,n,n);
-      S.settings.logo=c.toDataURL('image/png');persist('settings');render();toast('Logo updated')};
+      S.settings['logo'+k]=c.toDataURL('image/png');persist('settings');render();toast((k==='D'?'Dark':'Light')+' mode logo updated')};
     im.onerror=()=>toast('Could not read that image');im.src=rd.result};
   rd.readAsDataURL(f);
 }
