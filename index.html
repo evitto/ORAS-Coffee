@@ -15,9 +15,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ORAS Coffee POS</title>
 <style>
-:root{--bg:#F8F7F4;--tx:#242321;--ac:#6F4E37;--ac2:#5a3e2b;--sec:#E9E2D8;--card:#fff;--bd:#e4ded4;--mut:#6b655d;--ok:#4f7a5a;--bad:#a8473a;--sh:0 1px 3px rgba(36,35,33,.07)}
-[data-theme=dark]{--bg:#1c1b19;--tx:#f1ede6;--ac:#c49a74;--ac2:#d8b090;--sec:#2c2a27;--card:#252421;--bd:#38352f;--mut:#a39c91;--ok:#7fb48c;--bad:#e0806f;--sh:none}
+:root{--bg:#F8F7F4;--tx:#242321;--ac:#6F4E37;--ac2:#5a3e2b;--sec:#E9E2D8;--card:#fff;--bd:#e4ded4;--mut:#6b655d;--ok:#4f7a5a;--bad:#a8473a;--sh:0 1px 3px rgba(36,35,33,.07);--gbg:rgba(79,122,90,.13);--ybg:rgba(224,176,40,.20)}
+[data-theme=dark]{--bg:#1c1b19;--tx:#f1ede6;--ac:#c49a74;--ac2:#d8b090;--sec:#2c2a27;--card:#252421;--bd:#38352f;--mut:#a39c91;--ok:#7fb48c;--bad:#e0806f;--sh:none;--gbg:rgba(127,180,140,.15);--ybg:rgba(224,184,70,.16)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{scrollbar-width:none;-ms-overflow-style:none}*::-webkit-scrollbar{display:none;width:0;height:0}
 html,body{margin:0;height:100%;background:var(--sec);color:var(--tx);font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;overflow-x:hidden}
 button,input,select{font:inherit;color:inherit}
 html,body{overscroll-behavior:none}body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}input{-webkit-user-select:text;user-select:text}button{touch-action:manipulation}
@@ -80,6 +81,11 @@ input[type=text],input[type=number],select{width:100%;min-height:48px;border-rad
 .cl{position:absolute;top:6px;right:10px;z-index:2}.sh h2{padding-right:44px}.dlg h2,#receipt h2{padding:0}.sh:focus{outline:none}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .ib{width:44px;height:44px;border-radius:12px;background:var(--sec)}
+.os{gap:6px;padding:4px 0}.os .ob{flex:1;min-width:0;display:flex;align-items:center;gap:10px;text-align:left;width:auto}
+.ck{flex:none;width:40px;height:40px;min-height:40px;border-radius:12px;border:1.5px solid var(--bd);background:var(--card);color:var(--mut);font-size:18px;font-weight:700}
+.ck.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.row.s-ok,.row.s-c,.row.s-v{margin:2px -6px;padding:4px 6px;width:calc(100% + 12px);border-radius:12px;border-bottom-color:transparent}
+.row.s-ok{background:var(--gbg)}.row.s-c{background:var(--ybg)}.row.s-v{background:var(--sec);opacity:.55;filter:grayscale(1)}
 @media print{body *{visibility:hidden}#receipt,#receipt *{visibility:visible}#ov{position:absolute;background:none;display:block}.sh{position:static;transform:none;max-height:none;overflow:visible;background:#fff;color:#000;padding:0}#receipt{position:absolute;left:0;top:0;width:100%;color:#000}}
 </style>
 </head>
@@ -178,7 +184,7 @@ function vPos(){
   return `<div class="tabs" role="tablist">${CATS().map(c=>`<button class="tab ${c===S.cat?'on':''}" role="tab" aria-selected="${c===S.cat}" data-a="cat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
   ${ps.length?`<div class="grid">${ps.map(p=>`<button class="pc ${p.on?'':'off'}" data-a="prod" data-id="${p.id}" aria-label="${esc(p.name)} ${fmt(p.price)}${p.on?'':' unavailable'}"><span class="em">${p.em||'☕'}</span><b>${esc(p.name)}</b><small>${p.on?esc(p.desc):'Unavailable today'}</small><span class="pr">${fmt(p.price)}</span></button>`).join('')}</div>`:'<div class="empty"><div class="em">☕</div>No products here yet.<br>Add some under More → Products.</div>'}`;
 }
-const orow=o=>`<button class="row" data-a="ord" data-id="${o.no}"><b>#${o.no}</b><span class="g"><small style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust?`<b style="color:var(--tx);font-weight:600;display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">${esc(o.cust)}</b> · `:''}${tm(o.t)} · ${o.method}${o.voided?' · <span style="color:var(--bad)">Voided</span>':o.void?' · <span style="color:var(--bad)">Cancelled</span>':''}</small></span><b style="${o.void||o.voided?'text-decoration:line-through;color:var(--mut)':''}">${fmt(o.total)}</b></button>`;
+const orow=o=>{const st=o.voided?'v':o.void?'c':o.done?'ok':'';return `<div class="row os ${st?'s-'+st:''}"><button class="ob" data-a="ord" data-id="${o.no}"><b>#${o.no}</b><span class="g"><small style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust?`<b style="color:var(--tx);font-weight:600;display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">${esc(o.cust)}</b> · `:''}${tm(o.t)} · ${o.method}${o.voided?' · <span style="color:var(--bad)">Voided</span>':o.void?' · <span style="color:var(--bad)">Cancelled</span>':''}</small></span><b style="${o.void||o.voided?'text-decoration:line-through;color:var(--mut)':''}">${fmt(o.total)}</b></button>${st==='v'||st==='c'?'':`<button class="ck ${o.done?'on':''}" data-a="mdone" data-id="${o.no}" aria-pressed="${!!o.done}" aria-label="${o.done?'Mark order #'+o.no+' as not complete':'Mark order #'+o.no+' as complete'}">✓</button>`}</div>`};
 function vOrders(){const o=today().slice().reverse();return `<h2>Today's orders</h2>${o.length?`<div class="lst">${o.map(orow).join('')}</div>`:'<div class="empty"><div class="em">🧾</div>No orders yet today.<br>Completed orders will show up here.</div>'}`}
 function vDash(){
   const o=today().filter(x=>!x.void&&!x.voided),tot=o.reduce((a,x)=>a+x.total,0),q={};
@@ -266,12 +272,12 @@ function complete(){
 }
 function showReceipt(o,fresh){
   const s=S.settings;
-  sheet(`<div id="receipt">${fresh?'<div class="ok">✓</div><h2>Payment Complete</h2>':'<h2>Order details</h2>'+(o.voided?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Voided at '+tm(o.voided)+'</div>':o.void?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Cancelled at '+tm(o.void)+'</div>':'')}
+  sheet(`<div id="receipt">${fresh?'<div class="ok">✓</div><h2>Payment Complete</h2>':'<h2>Order details</h2>'+(o.voided?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Voided at '+tm(o.voided)+'</div>':o.void?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Cancelled at '+tm(o.void)+'</div>':o.done?'<div style="color:var(--ok);font-weight:700;margin-bottom:6px">Completed at '+tm(o.done)+'</div>':'')}
   ${s.rShop&&s.logo?`<img src="${s.logo}" alt="" style="width:56px;height:56px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 6px">`:''}${s.rShop?`<div style="font-weight:700">${esc(s.shop)}</div>`:''}<div style="color:var(--mut);margin-bottom:10px">${s.rNo?'Order #'+o.no+' · ':''}${new Date(o.t).toLocaleDateString('en-PH')} ${tm(o.t)}${o.cust?`<br><span style="color:var(--tx)">Customer: <b>${esc(o.cust)}</b></span>`:''}</div>
   <div style="border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd);padding:8px 0;margin-bottom:8px">${o.items.map(i=>`<div class="l"><span>${esc(i.name)} × ${i.qty}${i.opts.length?`<small style="display:block;color:var(--mut)">${esc(i.opts.join(', '))}</small>`:''}${i.dd?`<small style="display:block;color:var(--mut)">${esc(i.dn)} −${fmt(i.dd)}</small>`:''}</span><span>${fmt(i.unit*i.qty)}</span></div>`).join('')}</div>
   ${o.disc?`<div class="l"><span>Subtotal</span><span>${fmt(o.sub)}</span></div>`:''}${o.di?`<div class="l"><span>Item discounts</span><span>−${fmt(o.di)}</span></div>`:''}${(o.di===undefined?o.disc:o.dor)?`<div class="l"><span>${o.di===undefined?'Discount':'Order discount'}${o.dname?' ('+esc(o.dname)+')':''}</span><span>−${fmt(o.di===undefined?o.disc:o.dor)}</span></div>`:''}<div class="l" style="font-size:20px"><b>Total</b><b>${fmt(o.total)}</b></div>
   ${s.rPay?`<div class="l"><span>Payment</span><span>${o.method}</span></div>`:''}${o.method==='Cash'?`<div class="l"><span>Received</span><span>${fmt(o.recv)}</span></div><div class="l"><span>Change</span><span>${fmt(o.change)}</span></div>`:''}</div>
-  <div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-a="${fresh?'newo':'close'}">${fresh?'New Order':'Close'}</button><button class="btn sec" data-a="print">Print Receipt</button>${!fresh?(o.voided?`<button class="btn sec" data-a="vrs" data-id="${o.no}">🔒 Restore voided order</button>`:o.void?`<button class="btn sec" data-a="unvoid" data-id="${o.no}">Restore order</button>`:`<button class="btn sec" style="color:var(--bad)" data-a="void" data-id="${o.no}">Cancel order</button><button class="btn sec" style="color:var(--bad)" data-a="vdo" data-id="${o.no}">🔒 Void order</button>`):''}</div>`);
+  <div style="display:grid;gap:8px;margin-top:16px"><button class="btn" data-a="${fresh?'newo':'close'}">${fresh?'New Order':'Close'}</button>${!fresh&&!o.void&&!o.voided?`<button class="btn sec" data-a="rdone" data-id="${o.no}">${o.done?'Mark as not complete':'✓ Mark as complete'}</button>`:''}<button class="btn sec" data-a="print">Print Receipt</button>${!fresh?(o.voided?`<button class="btn sec" data-a="vrs" data-id="${o.no}">🔒 Restore voided order</button>`:o.void?`<button class="btn sec" data-a="unvoid" data-id="${o.no}">Restore order</button>`:`<button class="btn sec" style="color:var(--bad)" data-a="void" data-id="${o.no}">Cancel order</button><button class="btn sec" style="color:var(--bad)" data-a="vdo" data-id="${o.no}">🔒 Void order</button>`):''}</div>`);
 }
 
 /* ============ PRODUCTS ============ */
@@ -352,6 +358,8 @@ const A={
   vdo:d=>{const o=S.orders.find(x=>x.no==d.id);askPin('Void order #'+o.no,()=>{delete o.void;o.voided=Date.now();persist('orders');render();toast('Order voided')})},
   vrs:d=>{const o=S.orders.find(x=>x.no==d.id);askPin('Restore order #'+o.no,()=>{delete o.voided;persist('orders');render();toast('Order restored')})},
   ord:d=>showReceipt(S.orders.find(o=>o.no==d.id)),
+  mdone:d=>{const o=S.orders.find(x=>x.no==d.id);if(!o||o.void||o.voided)return;if(o.done)delete o.done;else o.done=Date.now();persist('orders');const m=$('#main'),y=m.scrollTop;render();m.scrollTop=y;toast(o.done?'Order #'+o.no+' complete':'Order #'+o.no+' reopened')},
+  rdone:d=>{const o=S.orders.find(x=>x.no==d.id);if(!o||o.void||o.voided)return;if(o.done)delete o.done;else o.done=Date.now();persist('orders');render();showReceipt(o);toast(o.done?'Marked complete':'Marked not complete')},
   editp:d=>editProd(d.id),savep:saveProd,
   tog:d=>{const p=S.products.find(x=>x.id===d.id);p.on=!p.on;persist('products');render()},
   delp:d=>confirmDlg('Delete this product?',()=>{S.products=S.products.filter(p=>p.id!==d.id);persist('products');render();toast('Product deleted')},'Delete'),
