@@ -26,10 +26,11 @@ button{cursor:pointer;border:0;background:none;min-height:44px;transition:transf
 button:active:not(:disabled){transform:scale(.97)}button:disabled{opacity:.4;cursor:not-allowed}
 :focus-visible{outline:3px solid var(--ac);outline-offset:2px}
 #app{max-width:720px;margin:0 auto;background:var(--bg);box-shadow:0 0 0 1px var(--bd);height:100%;display:flex;flex-direction:column;position:relative}
-header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+header{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
 .brand{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-width:0}.bn{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
 #logo{width:38px;height:38px;border-radius:10px;object-fit:cover;flex:none}#logo[hidden]{display:none}
 header h1{font-size:19px;line-height:1.2;margin:0;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.qrb{width:40px;height:40px;min-height:40px;border-radius:12px;background:var(--sec);color:var(--tx);display:grid;place-items:center;padding:0}.qrb svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ono{justify-self:end;font-weight:600;background:var(--sec);padding:6px 12px;border-radius:99px;font-size:14px}
 main{flex:1;overflow-y:auto;padding:0 16px 24px;scroll-behavior:smooth}
 .tabs{position:sticky;top:0;z-index:5;display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:6px 16px 10px;scroll-padding-inline:16px;background:var(--bg);scrollbar-width:none;-ms-overflow-style:none;cursor:grab;user-select:none;-webkit-user-select:none;overscroll-behavior-x:contain}.tabs.drag{cursor:grabbing}.tab:first-child{margin-left:auto}.tab:last-child{margin-right:auto}
@@ -100,6 +101,7 @@ input[type=text],input[type=number],select{width:100%;min-height:48px;border-rad
   <header>
     <div class="brand"><img id="logo" alt="" hidden><div class="bn"><h1 id="shopn">ORAS Coffee</h1></div></div>
     <span class="ono" id="ono"></span>
+    <button class="qrb" data-a="qrshow" aria-label="Show payment QR code"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM20 14h1M14 20h1M18 18h3v3h-3z"/></svg></button>
   </header>
   <main id="main"></main>
   <div id="barwrap"></div>
@@ -134,12 +136,12 @@ const mkSettings=v=>{const x={...DEF,...v};if(x.logo){x.logoL=x.logoL||x.logo;x.
 let S={
   products:LS.get('products',null)||SEED.map((s,i)=>({id:'p'+i,cat:s[0],name:s[1],price:s[2],desc:s[3],em:s[4],on:true})),
   orders:LS.get('orders',[]),opts:LS.get('opts',null)||clone(OPT),cats:LS.get('cats',null)||clone(DEFCATS),settings:mkSettings(LS.get('settings',{})),
-  cart:LS.get('cart',{items:[],dc:null}),discounts:LS.get('discounts',null)||[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}],next:LS.get('next',1001),
+  cart:LS.get('cart',{items:[],dc:null}),qrs:LS.get('qrs',[]),discounts:LS.get('discounts',null)||[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}],next:LS.get('next',1001),
   view:'pos',sub:null,cat:'Coffee',cur:null,pay:{m:'Cash',r:''}
 };
 const persist=k=>{if(window._rl)return;if(!LS.set(k,k==='settings'?S.settings:S[k]))toast('⚠ Storage full – not saved! Export your data, then clear orders.',6000)};
 LS.set('products',S.products);LS.set('cats',S.cats);LS.set('opts',S.opts);
-let PF=null,PIN=null,IP=null;
+let PF=null,PIN=null,IP=null,QRB=null;
 const hp=c=>{let h=5381;for(const ch of 'oras'+c)h=(h*33)^ch.charCodeAt(0);return String(h>>>0)};
 const CATS=()=>S.cats.map(c=>c.n);
 const groupsOf=c=>(S.cats.find(x=>x.n===c)||{g:[]}).g;
@@ -166,7 +168,7 @@ let tt;function toast(m,ms=1600){const t=$('#toast');t.textContent=m;t.classList
 
 /* ============ MODALS ============ */
 function sheet(html,dlg){const o=$('#ov'),s=$('#sh'),first=!o.classList.contains('open');$('#toast').classList.remove('on');s.className='sh'+(dlg?' dlg':'');s.innerHTML=(dlg?'':'<div class="grab"></div><button class="ib cl" data-a="close" aria-label="Close">✕</button>')+html;if(!o.classList.contains('open')){o.classList.add('show');requestAnimationFrame(()=>requestAnimationFrame(()=>o.classList.add('open')))}const f=s.querySelector('[autofocus]');if(f)f.focus();else if(first)s.focus()}
-function closeSheet(){const o=$('#ov');o.classList.remove('open');setTimeout(()=>{if(!o.classList.contains('open'))o.classList.remove('show')},200);S.cur=null;PF=null;PIN=null}
+function closeSheet(){const o=$('#ov');o.classList.remove('open');setTimeout(()=>{if(!o.classList.contains('open'))o.classList.remove('show')},200);S.cur=null;PF=null;PIN=null;QRB=null}
 function confirmDlg(msg,fn,label='Confirm',keep='Cancel'){window._cf=fn;sheet(`<h2 style="font-size:19px">${esc(msg)}</h2><div style="display:flex;gap:8px;margin-top:16px"><button class="btn sec" data-a="close">${keep}</button><button class="btn bad" data-a="cfok">${label}</button></div>`,1)}
 $('#ov').addEventListener('click',e=>{if(e.target.id==='ov')closeSheet()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();if(e.key==='Enter'){const i=e.target.id;if(i==='nc')A.cadd();else if(i==='cn1'&&S.pay)A.nameok();else if(['f1','f3','f4','f7'].includes(i)&&PF)A.savep()}});
@@ -202,6 +204,7 @@ function vDash(){
 }
 function vMore(){
   const s=S.settings;
+  if(S.sub==='qr')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">QR codes</h2><button class="btn sm" data-a="qradd">+ Upload</button><input type="file" id="qrf" accept="image/*" multiple data-a2="qrf" hidden></div><p style="color:var(--mut)">Upload your payment QR codes (GCash, Maya, bank…) — you can pick several at once. Tap the QR button at the top right of the app to show them to a customer. Up to ${QR_MAX}. Tip: crop each screenshot to just the QR code so it shows larger.</p>${S.qrs.length?`<div class="lst">${S.qrs.map((q,i)=>`<div class="pd"><div style="display:flex;gap:10px;align-items:center"><button data-a="qrv" data-i="${i}" aria-label="Preview ${esc(q.label)}" style="flex:none;width:64px;height:64px;min-height:64px;border-radius:12px;border:1px solid var(--bd);background:#fff;overflow:hidden;padding:0"><img src="${q.src}" alt="" style="width:100%;height:100%;object-fit:contain"></button><input type="text" aria-label="QR code name" data-qn="${i}" value="${esc(q.label)}" maxlength="30" style="flex:1;min-width:0"></div><div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end"><button class="ib" data-a="qmv" data-i="${i}" data-d="-1" ${i?'':'disabled'} aria-label="Move up">↑</button><button class="ib" data-a="qmv" data-i="${i}" data-d="1" ${i<S.qrs.length-1?'':'disabled'} aria-label="Move down">↓</button><button class="ib" data-a="qdel" data-i="${i}" aria-label="Delete ${esc(q.label)}">🗑</button></div></div>`).join('')}</div>`:'<div class="empty"><div class="em">📱</div>No QR codes yet.<br>Tap + Upload to add one.</div>'}`;
   if(S.sub==='disc')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Discounts</h2><button class="btn sm" data-a="dadd">+ Add</button></div><p style="color:var(--mut)">Each discount is a % off or a fixed amount off, and you choose where it can be used: on single items, on the whole order, or both. A fixed amount on an item applies to that whole line.</p>${S.discounts.length?`<div class="lst">${S.discounts.map((d,i)=>`<div class="pd"><input type="text" aria-label="Discount name" data-de="${i}|name" value="${esc(d.name)}" style="margin-bottom:6px"><div style="display:flex;gap:6px"><select aria-label="Discount type" data-de="${i}|type" style="flex:1"><option value="pct" ${d.type==='pct'?'selected':''}>Percent (%)</option><option value="amt" ${d.type==='amt'?'selected':''}>Amount (${esc(S.settings.cur)})</option></select><input type="number" inputmode="decimal" min="0" aria-label="Discount value" data-de="${i}|v" value="${d.v}" style="width:100px"><button class="ib" data-a="ddel" data-x="${i}" aria-label="Delete discount">🗑</button></div><select aria-label="Applies to" data-de="${i}|scope" style="margin-top:6px"><option value="both" ${sc(d)==='both'?'selected':''}>Items and whole order</option><option value="item" ${sc(d)==='item'?'selected':''}>Individual items only</option><option value="order" ${sc(d)==='order'?'selected':''}>Whole order only</option></select></div>`).join('')}</div>`:'<div class="empty">No discounts yet.<br>Tap + Add to create one.</div>'}`;
   if(S.sub==='cats')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Categories</h2></div><p style="color:var(--mut)">Add or reorder categories and choose which options each one offers.</p><div class="lst">${S.cats.map((c,x)=>{const n=S.products.filter(p=>p.cat===c.n).length;return `<div class="pd"><div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" aria-label="Category name" data-cn="${x}" value="${esc(c.n)}" style="flex:1"><button class="ib" data-a="cmv" data-x="${x}" data-d="-1" ${x?'':'disabled'} aria-label="Move up">↑</button><button class="ib" data-a="cmv" data-x="${x}" data-d="1" ${x<S.cats.length-1?'':'disabled'} aria-label="Move down">↓</button><button class="ib" data-a="cdel" data-x="${x}" ${S.cats.length>1?'':'disabled'} aria-label="Delete category">🗑</button></div><small style="color:var(--mut)">${n} product${n==1?'':'s'} · options offered:</small><div class="chips" style="margin-top:6px">${Object.keys(GRP).map(g=>`<button class="chip ${c.g.includes(g)?'on':''}" data-a="cg" data-x="${x}" data-g="${g}" aria-pressed="${c.g.includes(g)}">${GRP[g].t}</button>`).join('')}</div></div>`}).join('')}</div><h3>New category</h3><div style="display:flex;gap:8px"><input type="text" id="nc" aria-label="New category name" placeholder="e.g. Sandwiches" style="flex:1"><button class="btn sm" data-a="cadd">Add</button></div>`;
   if(S.sub==='opts')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Option prices</h2></div><p style="color:var(--mut);margin:0 0 4px">Default choices and extra charges. Every product uses these unless you set custom prices in its product form. Use 0 for no charge.</p>${Object.keys(GRP).map(g=>optRows('d',g,S.opts[g])).join('')}`;
@@ -213,7 +216,7 @@ function vMore(){
     <h3>Appearance</h3>${sw('dark','Dark mode')}
     <h3>Security</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="setpin">${s.pin?'Change void passcode':'Set void passcode'}</button>${s.pin?'<button class="btn sec" data-a="rmpin">Remove void passcode</button>':''}</div><small style="color:var(--mut);display:block;margin-top:6px">A 4-digit passcode is required to void an order or restore a voided one.</small>
     <h3>Data</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="export">Export data</button><button class="btn sec" data-a="import">Import data</button><input type="file" id="imp" accept="application/json,.json" data-a2="imp" hidden><button class="btn sec" data-a="clr">Clear orders</button><button class="btn bad" data-a="reset">Reset POS</button></div>${(()=>{const kb=storeKB();return `<small style="display:block;margin-top:8px;color:${kb>4000?'var(--bad)':'var(--mut)'}">Storage used: about ${kb.toLocaleString('en-PH')} KB of ~5,000 KB${kb>4000?' — almost full! Export, then clear orders.':''}</small>`})()}`}
-  return `<h2>More</h2><div class="lst">${IP?'<button class="row" data-a="install"><span class="g"><b>📲 Install app</b><small>Add ORAS POS to your home screen</small></span>›</button>':''}<button class="row" data-a="sub" data-v="products"><span class="g"><b>☕ Products</b><small>Add, edit, set prices and availability</small></span>›</button><button class="row" data-a="sub" data-v="cats"><span class="g"><b>🗂 Categories</b><small>Add, rename, reorder</small></span>›</button><button class="row" data-a="sub" data-v="disc"><span class="g"><b>🏷 Discounts</b><small>Percent or fixed-amount discounts</small></span>›</button><button class="row" data-a="sub" data-v="opts"><span class="g"><b>💲 Option prices</b><small>Sizes, hot/iced, milks, extras</small></span>›</button><button class="row" data-a="sub" data-v="settings"><span class="g"><b>⚙️ Settings</b><small>Shop, receipt, appearance, data</small></span>›</button></div>`;
+  return `<h2>More</h2><div class="lst">${IP?'<button class="row" data-a="install"><span class="g"><b>📲 Install app</b><small>Add ORAS POS to your home screen</small></span>›</button>':''}<button class="row" data-a="sub" data-v="products"><span class="g"><b>☕ Products</b><small>Add, edit, set prices and availability</small></span>›</button><button class="row" data-a="sub" data-v="cats"><span class="g"><b>🗂 Categories</b><small>Add, rename, reorder</small></span>›</button><button class="row" data-a="sub" data-v="qr"><span class="g"><b>📱 QR codes</b><small>Payment QR codes to show customers</small></span>›</button><button class="row" data-a="sub" data-v="disc"><span class="g"><b>🏷 Discounts</b><small>Percent or fixed-amount discounts</small></span>›</button><button class="row" data-a="sub" data-v="opts"><span class="g"><b>💲 Option prices</b><small>Sizes, hot/iced, milks, extras</small></span>›</button><button class="row" data-a="sub" data-v="settings"><span class="g"><b>⚙️ Settings</b><small>Shop, receipt, appearance, data</small></span>›</button></div>`;
 }
 
 /* ============ CUSTOMIZE ============ */
@@ -266,7 +269,7 @@ function drawPay(){
   <div class="pay">${['Cash','GCash','Card'].map(m=>`<button class="chip ${p.m===m?'on':''}" data-a="pm" data-v="${m}" aria-pressed="${p.m===m}">${m}</button>`).join('')}</div>
   ${cash?`<label>Amount Received</label><div class="amt">${fmt(r)}</div><div class="chg ${ch<0&&r?'bad':''}">${r?(ch>=0?'Change: '+fmt(ch):'Short by '+fmt(-ch)):''}</div>
   <div class="chips q">${[100,200,500,1000].map(v=>`<button class="chip" data-a="quick" data-v="${v}">${fmt(v)}</button>`).join('')}<button class="chip" data-a="quick" data-v="${t.total}">Exact</button></div>
-  <div class="keys">${['1','2','3','4','5','6','7','8','9','00','0','⌫'].map(k=>`<button data-a="key" data-v="${k}" aria-label="${k==='⌫'?'Backspace':k}">${k}</button>`).join('')}</div>`:`<p style="text-align:center;color:var(--mut);padding:18px 0">Confirm ${p.m} payment of <b style="color:var(--tx)">${fmt(t.total)}</b> was received.</p>`}
+  <div class="keys">${['1','2','3','4','5','6','7','8','9','00','0','⌫'].map(k=>`<button data-a="key" data-v="${k}" aria-label="${k==='⌫'?'Backspace':k}">${k}</button>`).join('')}</div>`:`<p style="text-align:center;color:var(--mut);padding:18px 0">Confirm ${p.m} payment of <b style="color:var(--tx)">${fmt(t.total)}</b> was received.</p>${p.m==='GCash'&&S.qrs.length?'<button class="btn sec" data-a="qrpay">📱 Show QR code</button>':''}`}
   <div class="stk"><button class="btn" data-a="done" ${cash&&r<t.total?'disabled':''}>Complete Payment</button></div>`);
 }
 function complete(){
@@ -381,6 +384,10 @@ const A={
   mdone:d=>{const o=S.orders.find(x=>x.no==d.id);if(!o||o.void||o.voided)return;if(o.done)delete o.done;else o.done=Date.now();persist('orders');const m=$('#main'),y=m.scrollTop;render();m.scrollTop=y;toast(o.done?'Order #'+o.no+' complete':'Order #'+o.no+' reopened')},
   rdone:d=>{const o=S.orders.find(x=>x.no==d.id);if(!o||o.void||o.voided)return;if(o.done)delete o.done;else o.done=Date.now();persist('orders');render();showReceipt(o);toast(o.done?'Marked complete':'Marked not complete')},
   editp:d=>editProd(d.id),savep:saveProd,
+  qrshow:()=>{QRB=null;drawQR(0)},qrv:d=>drawQR(d.i),qrgo:()=>{closeSheet();S.view='more';S.sub='qr';render()},
+  qrpay:()=>{QRB=1;drawQR(0)},qrback:()=>{QRB=null;drawPay()},qradd:()=>$('#qrf').click(),
+  qmv:d=>{const x=+d.i,y=x+ +d.d;if(!S.qrs[y])return;[S.qrs[x],S.qrs[y]]=[S.qrs[y],S.qrs[x]];persist('qrs');render()},
+  qdel:d=>{const q=S.qrs[+d.i];confirmDlg(`Delete "${q.label}"?`,()=>{S.qrs.splice(+d.i,1);persist('qrs');render();toast('QR code deleted')},'Delete')},
   pem:d=>{if(!PF)return;syncPF();PF.em=d.v;drawPF()},
   tog:d=>{const p=S.products.find(x=>x.id===d.id);p.on=!p.on;persist('products');render()},
   delp:d=>confirmDlg('Delete this product?',()=>{S.products=S.products.filter(p=>p.id!==d.id);persist('products');render();toast('Product deleted')},'Delete'),
@@ -394,7 +401,7 @@ const A={
   cadd:()=>{const i=$('#nc'),v=i.value.trim();if(!v)return toast('Enter a category name');if(CATS().some(c=>c.toLowerCase()===v.toLowerCase()))return toast('That category already exists');S.cats.push({n:v,g:[]});persist('cats');render();toast('Category added')},
   dadd:()=>{S.discounts.push({id:'d'+Date.now(),name:'New discount',type:'pct',v:10,scope:'both'});persist('discounts');render()},
   ddel:d=>{const x=S.discounts[d.x];confirmDlg(`Delete "${x.name}"?`,()=>{S.discounts.splice(d.x,1);persist('discounts');render()},'Delete')},
-  export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined},next:S.next},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
+  export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined},next:S.next,qrs:S.qrs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
   import:()=>$('#imp').click(),
   clr:()=>confirmDlg('Clear all orders? This cannot be undone.',()=>guard('Clear all orders',()=>{S.orders=[];persist('orders');render();toast('Orders cleared')}),'Clear'),
   reset:()=>confirmDlg('Reset the POS? Products, orders and settings will be erased.',()=>guard('Reset POS',()=>{Object.keys(localStorage).filter(k=>k.startsWith('bb_')).forEach(k=>localStorage.removeItem(k));location.reload()}),'Reset')
@@ -407,6 +414,8 @@ document.addEventListener('change',e=>{
   if(t.dataset.cn!=null){const c=S.cats[+t.dataset.cn],v=t.value.trim();if(!v||S.cats.some(x=>x!==c&&x.n.toLowerCase()===v.toLowerCase())){toast('Name is empty or already used');render();return}S.products.forEach(q=>{if(q.cat===c.n)q.cat=v});if(S.cat===c.n)S.cat=v;c.n=v;persist('cats');persist('products')}
   if(t.id==='f2'&&PF){syncPF();drawPF()}
   if(t.id==='f6'&&PF){syncPF();PF.o=t.checked?{}:null;drawPF()}
+  if(t.dataset.a2==='qrf'){addQRs([...t.files]);t.value=''}
+  if(t.dataset.qn!=null){const q=S.qrs[+t.dataset.qn];if(q){q.label=tx(t.value,30).trim()||'QR code';persist('qrs')}}
   if(t.dataset.a2==='imp'){readImport(t.files[0]);t.value=''}
   if(t.dataset.a2==='logoL'||t.dataset.a2==='logoD')setLogo(t.files[0],t.dataset.a2.slice(4));
   if(t.dataset.a2==='ldisc'){S.cart.items[+t.dataset.x].dc=t.value||null;persist('cart');drawCart();renderBar()}
@@ -432,6 +441,25 @@ function setLogo(f,k){
     im.onerror=()=>toast('Could not read that image');im.src=rd.result};
   rd.readAsDataURL(f);
 }
+/* ============ PAYMENT QR CODES ============ */
+const QR_MAX=6;
+function drawQR(i){
+  const L=S.qrs,back=QRB?'<button class="btn sec" style="margin-top:14px" data-a="qrback">Back to payment</button>':'';
+  if(!L.length){sheet(`<div class="empty"><div class="em">📱</div>No QR codes yet.<br>Add them in More → QR codes.</div><button class="btn" data-a="qrgo">Add QR codes</button>${back}`);return}
+  i=Math.min(Math.max(+i||0,0),L.length-1);const q=L[i];
+  sheet(`<h2 style="text-align:center;margin:6px 0 10px">${esc(q.label)}</h2><div style="background:#fff;border-radius:18px;padding:12px;margin:0 auto;max-width:360px"><img src="${q.src}" alt="${esc(q.label)} QR code" style="display:block;width:100%;max-height:58vh;object-fit:contain;margin:0 auto"></div>${L.length>1?`<div class="chips" style="justify-content:center;margin-top:14px">${L.map((x,k)=>`<button class="chip ${k===i?'on':''}" data-a="qrv" data-i="${k}" aria-pressed="${k===i}">${esc(x.label)}</button>`).join('')}</div>`:''}${back}`);
+}
+function prepQR(f){return new Promise((res,rej)=>{const rd=new FileReader();rd.onerror=rej;rd.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
+  let out='';for(const mx of [1600,1200,900,600]){const k=Math.min(1,mx/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*k)),h=Math.max(1,Math.round(im.height*k)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);
+    out=c.toDataURL('image/png');if(out.length<250000)break;out=c.toDataURL('image/jpeg',.9);if(out.length<250000)break}
+  res(out)};im.src=rd.result};rd.readAsDataURL(f)})}
+async function addQRs(files){
+  let n=0,bad=0,full=0;
+  for(const f of files){if(S.qrs.length>=QR_MAX){full=1;break}
+    try{const src=await prepQR(f);S.qrs.push({id:'q'+Date.now()+n,label:tx((f.name||'').replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim(),30)||'QR code',src});n++}catch{bad++}}
+  if(n){persist('qrs');render()}
+  toast(full?`Limit is ${QR_MAX} QR codes${n?' – added '+n:''}`:bad?(n?`Added ${n}, ${bad} could not be read`:'Could not read that image'):`${n} QR code${n>1?'s':''} added`,2500);
+}
 /* ============ BACKUP IMPORT ============ */
 const storeKB=()=>{let n=0;for(const k of Object.keys(localStorage))if(k.startsWith('bb_'))n+=k.length+(localStorage.getItem(k)||'').length;return Math.round(n/1024)};
 const nm=(v,d=0)=>{v=+v;return isFinite(v)?v:d},tx=(v,n=80)=>String(v==null?'':v).slice(0,n);
@@ -452,22 +480,23 @@ function cleanImport(j){
     ['void','voided','done'].forEach(k=>{if(+o[k])r[k]=+o[k]});return r});
   const st=j.settings&&typeof j.settings==='object'?j.settings:{},img=v=>typeof v==='string'&&/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(v)&&v.length<600000?v:'';
   const settings={shop:tx(st.shop,40).trim()||DEF.shop,cur:tx(st.cur,3).trim()||DEF.cur,rShop:st.rShop!==false,rNo:st.rNo!==false,rPay:st.rPay!==false,dark:!!st.dark,logoL:img(st.logoL||st.logo),logoD:img(st.logoD)};
+  const qrs=Array.isArray(j.qrs)?j.qrs.filter(q=>q&&/^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(q.src)&&q.src.length<300000).slice(0,QR_MAX).map((q,i)=>({id:tx(q.id,30).replace(/[^\w-]/g,'')||'q'+i,label:tx(q.label,30).trim()||'QR code',src:q.src})):null;
   const next=Math.max(1001,Math.trunc(nm(j.next)),...orders.map(o=>o.no+1));
-  return{products,cats,opts:{...clone(OPT),...cleanOpts(j.optionPrices)},discounts,orders,settings,next};
+  return{products,cats,opts:{...clone(OPT),...cleanOpts(j.optionPrices)},discounts,orders,settings,next,qrs};
 }
 function readImport(f){
   if(!f)return;const rd=new FileReader();
   rd.onload=()=>{let d;try{d=cleanImport(JSON.parse(rd.result))}catch{return toast('That is not a valid ORAS backup file',3000)}
     confirmDlg(`Import ${d.orders.length} order${d.orders.length==1?'':'s'} and ${d.products.length} product${d.products.length==1?'':'s'}? This replaces your current products, categories, discounts, option prices and orders.`,()=>guard('Import data',()=>{
-      Object.assign(S,{products:d.products,cats:d.cats,opts:d.opts,discounts:d.discounts,orders:d.orders,next:d.next,cart:{items:[],dc:null}});S.settings={...S.settings,...d.settings};
-      ['products','cats','opts','discounts','orders','next','settings','cart'].forEach(persist);S.view='more';S.sub=null;S.cat=S.cats[0].n;render();toast('Data imported')}),'Import')};
+      Object.assign(S,{products:d.products,cats:d.cats,opts:d.opts,discounts:d.discounts,orders:d.orders,next:d.next,cart:{items:[],dc:null}});if(d.qrs)S.qrs=d.qrs;S.settings={...S.settings,...d.settings};
+      ['products','cats','opts','discounts','orders','next','settings','cart','qrs'].forEach(persist);S.view='more';S.sub=null;S.cat=S.cats[0].n;render();toast('Data imported')}),'Import')};
   rd.onerror=()=>toast('Could not read that file');rd.readAsText(f);
 }
 /* ============ KEEP WINDOWS IN SYNC / NEW DAY ============ */
 window.addEventListener('storage',e=>{
   if(e.key===null){window._rl=1;setTimeout(()=>location.reload(),1000);return}
   if(!e.key.startsWith('bb_'))return;const k=e.key.slice(3);
-  if(!['orders','next','products','cats','opts','discounts','settings'].includes(k))return;
+  if(!['orders','next','products','cats','opts','discounts','settings','qrs'].includes(k))return;
   if(e.newValue==null){window._rl=1;setTimeout(()=>location.reload(),1000);return}   // other window reset the POS
   let v;try{v=JSON.parse(e.newValue)}catch{return}
   if(k==='settings')S.settings=mkSettings(v);else S[k]=v;
