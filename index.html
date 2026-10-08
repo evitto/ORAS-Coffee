@@ -53,6 +53,10 @@ h2{font-size:22px;margin:8px 0 14px}h3{font-size:14px;margin:16px 0 8px;color:va
 .row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--bd);width:100%;text-align:left}
 .row .g{flex:1;min-width:0}.row small{color:var(--mut);display:block}
 .lst{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:0 14px}.lst .row:last-child{border:0}
+.gh{display:flex;justify-content:space-between;margin:18px 4px 6px;font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mut)}
+.dh{flex:none;width:30px;height:44px;min-height:44px;margin-left:-6px;padding:0;background:none;color:var(--mut);font-size:20px;display:grid;place-items:center;cursor:grab;touch-action:none;border-radius:8px}
+.row.shift{transition:transform .15s}
+.row.dragging{position:relative;z-index:6;background:var(--card);box-shadow:0 8px 22px rgba(0,0,0,.18);border-radius:12px;border-bottom-color:transparent;transition:none}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;box-shadow:var(--sh)}
 .stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}.stats .card{text-align:center}.stats .card small{color:var(--mut)}.stats .card b{display:block;font-size:24px;letter-spacing:-.5px}
 .big{grid-column:1/-1;background:var(--ac);color:#fff}.big small{color:#fff!important;opacity:.8}.big b{font-size:34px!important}
@@ -122,7 +126,7 @@ const SEED=[['Coffee','Espresso',90,'Double shot','☕'],['Coffee','Americano',1
 ['Tea','English Breakfast',100,'Classic black','🫖'],['Tea','Green Tea',100,'Light and clean','🍃'],['Tea','Iced Tea',120,'House blend','🧊'],
 ['Pastries','Croissant',120,'Buttery, baked daily','🥐'],['Pastries','Chocolate Muffin',110,'Double chocolate','🧁'],['Pastries','Banana Bread',100,'Moist slice','🍞'],['Pastries','Cinnamon Roll',130,'Cream cheese glaze','🍥'],
 ['Add-ons','Extra Shot',40,'Espresso shot','➕'],['Add-ons','Oat Milk',40,'Dairy-free','🌾'],['Add-ons','Vanilla Syrup',30,'Sweet pump','🍯'],['Add-ons','Caramel Syrup',30,'Sweet pump','🍯']];
-const OPT={size:[['Small',0],['Medium',20],['Large',40]],temp:[['Hot',0],['Iced',0]],milk:[['Regular',0],['Oat',40],['Soy',30]],extras:[['Extra Shot',40],['Vanilla',30],['Caramel',30]]};
+const OPT={size:[['S',0],['M',20],['L',40]],temp:[['Hot',0],['Iced',0]],milk:[['Regular',0],['Oat',40],['Soy',30]],extras:[['Extra Shot',40],['Vanilla',30],['Caramel',30]]};
 const GRP={size:{t:'Size',m:0},temp:{t:'Temperature',m:0},milk:{t:'Milk',m:0},extras:{t:'Extras',m:1}};
 const DEFCATS=[{n:'Coffee',g:['size','temp','milk','extras']},{n:'Non-Coffee',g:['size','temp','milk']},{n:'Tea',g:['size','temp']},{n:'Pastries',g:[]},{n:'Add-ons',g:[]}];
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -133,13 +137,15 @@ const DEF={shop:'ORAS Coffee',logo:'',logoL:'',logoD:'',cur:'₱',rShop:true,rNo
 
 const mkSettings=v=>{const x={...DEF,...v};if(x.logo){x.logoL=x.logoL||x.logo;x.logo=''}return x};
 /* ============ STATE ============ */
+const migSz=o=>{const z=o&&o.size;if(Array.isArray(z)&&z.length===3&&z[0]&&z[1]&&z[2]&&z[0][0]==='Small'&&z[1][0]==='Medium'&&z[2][0]==='Large'){z[0][0]='S';z[1][0]='M';z[2][0]='L'}return o};
 let S={
   products:LS.get('products',null)||SEED.map((s,i)=>({id:'p'+i,cat:s[0],name:s[1],price:s[2],desc:s[3],em:s[4],on:true})),
-  orders:LS.get('orders',[]),opts:LS.get('opts',null)||clone(OPT),cats:LS.get('cats',null)||clone(DEFCATS),settings:mkSettings(LS.get('settings',{})),
+  orders:LS.get('orders',[]),opts:migSz(LS.get('opts',null)||clone(OPT)),cats:LS.get('cats',null)||clone(DEFCATS),settings:mkSettings(LS.get('settings',{})),
   cart:LS.get('cart',{items:[],dc:null}),qrs:LS.get('qrs',[]),discounts:LS.get('discounts',null)||[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}],next:LS.get('next',1001),
   view:'pos',sub:null,cat:'Coffee',cur:null,pay:{m:'Cash',r:''}
 };
 const persist=k=>{if(window._rl)return;if(!LS.set(k,k==='settings'?S.settings:S[k]))toast('⚠ Storage full – not saved! Export your data, then clear orders.',6000)};
+S.products.forEach(p=>migSz(p.o));
 LS.set('products',S.products);LS.set('cats',S.cats);LS.set('opts',S.opts);
 let PF=null,PIN=null,IP=null,QRB=null;
 const hp=c=>{let h=5381;for(const ch of 'oras'+c)h=(h*33)^ch.charCodeAt(0);return String(h>>>0)};
@@ -171,7 +177,7 @@ function sheet(html,dlg){const o=$('#ov'),s=$('#sh'),first=!o.classList.contains
 function closeSheet(){const o=$('#ov');o.classList.remove('open');setTimeout(()=>{if(!o.classList.contains('open'))o.classList.remove('show')},200);S.cur=null;PF=null;PIN=null;QRB=null}
 function confirmDlg(msg,fn,label='Confirm',keep='Cancel'){window._cf=fn;sheet(`<h2 style="font-size:19px">${esc(msg)}</h2><div style="display:flex;gap:8px;margin-top:16px"><button class="btn sec" data-a="close">${keep}</button><button class="btn bad" data-a="cfok">${label}</button></div>`,1)}
 $('#ov').addEventListener('click',e=>{if(e.target.id==='ov')closeSheet()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();if(e.key==='Enter'){const i=e.target.id;if(i==='nc')A.cadd();else if(i==='cn1'&&S.pay)A.nameok();else if(['f1','f3','f4','f7'].includes(i)&&PF)A.savep()}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet();if(e.key==='Enter'){const i=e.target.id;if(i==='nc')A.cadd();else if(i==='cn1'&&S.pay)A.nameok();else if(['f1','f3','f4','f7'].includes(i)&&PF)A.savep();else if((i==='dn'||i==='dv')&&$('[data-a=dsave]'))$('[data-a=dsave]').click()}});
 
 /* ============ RENDER ============ */
 function render(){
@@ -191,7 +197,7 @@ function vPos(){
   if(!S.cats.some(c=>c.n===S.cat))S.cat=(S.cats[0]||{}).n;
   const ps=S.products.filter(p=>p.cat===S.cat);
   return `<div class="tabs" role="tablist">${CATS().map(c=>`<button class="tab ${c===S.cat?'on':''}" role="tab" aria-selected="${c===S.cat}" data-a="cat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-  ${ps.length?`<div class="grid">${ps.map(p=>`<button class="pc ${p.on?'':'off'}" data-a="prod" data-id="${p.id}" aria-label="${esc(p.name)} ${fmt(p.price)}${p.on?'':' unavailable'}"><span class="em">${esc(p.em||'☕')}</span><b>${esc(p.name)}</b><small>${p.on?esc(p.desc):'Unavailable today'}</small><span class="pr">${fmt(p.price)}</span></button>`).join('')}</div>`:'<div class="empty"><div class="em">☕</div>No products here yet.<br>Add some under More → Products.</div>'}`;
+  ${ps.length?`<div class="grid">${ps.map(p=>`<button class="pc ${p.on?'':'off'}" data-a="prod" data-id="${p.id}" aria-label="${esc(p.name)} ${fmt(p.price)}${p.on?'':' unavailable'}">${p.em?`<span class="em">${esc(p.em)}</span>`:''}<b>${esc(p.name)}</b><small>${p.on?esc(p.desc):'Unavailable today'}</small><span class="pr">${fmt(p.price)}</span></button>`).join('')}</div>`:'<div class="empty"><div class="em">☕</div>No products here yet.<br>Add some under More → Products.</div>'}`;
 }
 const orow=o=>{const st=o.voided?'v':o.void?'c':o.done?'ok':'';return `<div class="row os ${st?'s-'+st:''}"><button class="ob" data-a="ord" data-id="${o.no}"><b>#${o.no}</b><span class="g"><small style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust?`<b style="color:var(--tx);font-weight:600;display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">${esc(o.cust)}</b> · `:''}${tm(o.t)} · ${esc(o.method)}${o.voided?' · <span style="color:var(--bad)">Voided</span>':o.void?' · <span style="color:var(--bad)">Cancelled</span>':''}</small></span><b style="${o.void||o.voided?'text-decoration:line-through;color:var(--mut)':''}">${fmt(o.total)}</b></button>${st==='v'||st==='c'?'':`<button class="ck ${o.done?'on':''}" data-a="mdone" data-id="${o.no}" aria-pressed="${!!o.done}" aria-label="${o.done?'Mark order #'+o.no+' as not complete':'Mark order #'+o.no+' as complete'}">✓</button>`}</div>`};
 function vOrders(){const o=today().slice().reverse();return `<h2>Today's orders</h2>${o.length?`<div class="lst">${o.map(orow).join('')}</div>`:'<div class="empty"><div class="em">🧾</div>No orders yet today.<br>Completed orders will show up here.</div>'}`}
@@ -205,10 +211,11 @@ function vDash(){
 function vMore(){
   const s=S.settings;
   if(S.sub==='qr')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">QR codes</h2><button class="btn sm" data-a="qradd">+ Upload</button><input type="file" id="qrf" accept="image/*" multiple data-a2="qrf" hidden></div><p style="color:var(--mut)">Upload your payment QR codes (GCash, Maya, bank…) — you can pick several at once. Tap the QR button at the top right of the app to show them to a customer. Up to ${QR_MAX}. Tip: crop each screenshot to just the QR code so it shows larger.</p>${S.qrs.length?`<div class="lst">${S.qrs.map((q,i)=>`<div class="pd"><div style="display:flex;gap:10px;align-items:center"><button data-a="qrv" data-i="${i}" aria-label="Preview ${esc(q.label)}" style="flex:none;width:64px;height:64px;min-height:64px;border-radius:12px;border:1px solid var(--bd);background:#fff;overflow:hidden;padding:0"><img src="${q.src}" alt="" style="width:100%;height:100%;object-fit:contain"></button><input type="text" aria-label="QR code name" data-qn="${i}" value="${esc(q.label)}" maxlength="30" style="flex:1;min-width:0"></div><div style="display:flex;gap:6px;margin-top:8px;justify-content:flex-end"><button class="ib" data-a="qmv" data-i="${i}" data-d="-1" ${i?'':'disabled'} aria-label="Move up">↑</button><button class="ib" data-a="qmv" data-i="${i}" data-d="1" ${i<S.qrs.length-1?'':'disabled'} aria-label="Move down">↓</button><button class="ib" data-a="qdel" data-i="${i}" aria-label="Delete ${esc(q.label)}">🗑</button></div></div>`).join('')}</div>`:'<div class="empty"><div class="em">📱</div>No QR codes yet.<br>Tap + Upload to add one.</div>'}`;
-  if(S.sub==='disc')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Discounts</h2><button class="btn sm" data-a="dadd">+ Add</button></div><p style="color:var(--mut)">Each discount is a % off or a fixed amount off, and you choose where it can be used: on single items, on the whole order, or both. A fixed amount on an item applies to that whole line.</p>${S.discounts.length?`<div class="lst">${S.discounts.map((d,i)=>`<div class="pd"><input type="text" aria-label="Discount name" data-de="${i}|name" value="${esc(d.name)}" style="margin-bottom:6px"><div style="display:flex;gap:6px"><select aria-label="Discount type" data-de="${i}|type" style="flex:1"><option value="pct" ${d.type==='pct'?'selected':''}>Percent (%)</option><option value="amt" ${d.type==='amt'?'selected':''}>Amount (${esc(S.settings.cur)})</option></select><input type="number" inputmode="decimal" min="0" aria-label="Discount value" data-de="${i}|v" value="${d.v}" style="width:100px"><button class="ib" data-a="ddel" data-x="${i}" aria-label="Delete discount">🗑</button></div><select aria-label="Applies to" data-de="${i}|scope" style="margin-top:6px"><option value="both" ${sc(d)==='both'?'selected':''}>Items and whole order</option><option value="item" ${sc(d)==='item'?'selected':''}>Individual items only</option><option value="order" ${sc(d)==='order'?'selected':''}>Whole order only</option></select></div>`).join('')}</div>`:'<div class="empty">No discounts yet.<br>Tap + Add to create one.</div>'}`;
+  if(S.sub==='disc')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Discounts</h2><button class="btn sm" data-a="dadd">+ Add</button></div>${S.discounts.length?`<div class="lst" style="margin-top:14px">${S.discounts.map((d,k)=>`<button class="row" data-a="dedit" data-i="${k}"><span class="g"><b>${esc(d.name)}</b><small>${dLabel(d)}</small></span>›</button>`).join('')}</div>`:'<div class="empty">No discounts yet.<br>Tap + Add to create one.</div>'}`;
   if(S.sub==='cats')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Categories</h2></div><p style="color:var(--mut)">Add or reorder categories and choose which options each one offers.</p><div class="lst">${S.cats.map((c,x)=>{const n=S.products.filter(p=>p.cat===c.n).length;return `<div class="pd"><div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" aria-label="Category name" data-cn="${x}" value="${esc(c.n)}" style="flex:1"><button class="ib" data-a="cmv" data-x="${x}" data-d="-1" ${x?'':'disabled'} aria-label="Move up">↑</button><button class="ib" data-a="cmv" data-x="${x}" data-d="1" ${x<S.cats.length-1?'':'disabled'} aria-label="Move down">↓</button><button class="ib" data-a="cdel" data-x="${x}" ${S.cats.length>1?'':'disabled'} aria-label="Delete category">🗑</button></div><small style="color:var(--mut)">${n} product${n==1?'':'s'} · options offered:</small><div class="chips" style="margin-top:6px">${Object.keys(GRP).map(g=>`<button class="chip ${c.g.includes(g)?'on':''}" data-a="cg" data-x="${x}" data-g="${g}" aria-pressed="${c.g.includes(g)}">${GRP[g].t}</button>`).join('')}</div></div>`}).join('')}</div><h3>New category</h3><div style="display:flex;gap:8px"><input type="text" id="nc" aria-label="New category name" placeholder="e.g. Sandwiches" style="flex:1"><button class="btn sm" data-a="cadd">Add</button></div>`;
   if(S.sub==='opts')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Option prices</h2></div><p style="color:var(--mut);margin:0 0 4px">Default choices and extra charges. Every product uses these unless you set custom prices in its product form. Use 0 for no charge.</p>${Object.keys(GRP).map(g=>optRows('d',g,S.opts[g])).join('')}`;
-  if(S.sub==='products')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Products</h2><button class="btn sm" data-a="editp" data-id="">+ Add</button></div><div class="lst" style="margin-top:14px">${S.products.map(p=>`<div class="row"><button class="g" style="text-align:left" data-a="editp" data-id="${p.id}"><b>${esc(p.em||'')} ${esc(p.name)}</b><small>${esc(p.cat)} · ${fmt(p.price)}${p.on?'':' · Unavailable'}</small></button><button class="ib" data-a="tog" data-id="${p.id}" aria-label="Toggle availability">${p.on?'✅':'⛔'}</button></div>`).join('')}</div>`;
+  if(S.sub==='products'){const gr=S.cats.map(c=>({n:c.n,ps:S.products.filter(p=>p.cat===c.n)})).filter(g=>g.ps.length);
+    return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Products</h2><button class="btn sm" data-a="editp" data-id="">+ Add</button></div><p style="color:var(--mut);margin:10px 0 0">Drag <b>⠿</b> to reorder. This is the order shown on the POS.</p>${gr.map(g=>`<div class="gh"><span>${esc(g.n)}</span><span>${g.ps.length}</span></div><div class="lst">${g.ps.map(p=>`<div class="row" data-pid="${p.id}"><button class="dh" data-drag="${p.id}" aria-label="Reorder ${esc(p.name)}">⠿</button><button class="g" style="text-align:left" data-a="editp" data-id="${p.id}"><b>${p.em?esc(p.em)+' ':''}${esc(p.name)}</b><small>${fmt(p.price)}${p.on?'':' · Unavailable'}</small></button><button class="ib" data-a="tog" data-id="${p.id}" aria-label="Toggle availability">${p.on?'✅':'⛔'}</button></div>`).join('')}</div>`).join('')}`}
   if(S.sub==='settings'){const sw=(k,t)=>`<label class="sw" style="margin:0;color:var(--tx);font-size:16px">${t}<input type="checkbox" data-s="${k}" ${s[k]?'checked':''}></label>`;
     return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0">Settings</h2></div>
     <h3>Shop</h3><label for="s1">Shop name</label><input type="text" id="s1" data-s="shop" value="${esc(s.shop)}"><div style="display:grid;gap:12px;margin-top:6px">${logoBox('L','Logo · light mode','#F8F7F4')}${logoBox('D','Logo · dark mode','#1c1b19')}</div><p style="color:var(--mut);font-size:13px;margin:8px 0 0">Shown in the header. With only one uploaded, it's used for both modes. Receipts print the light logo.</p><label for="s2">Currency symbol</label><input type="text" id="s2" data-s="cur" value="${esc(s.cur)}" maxlength="3">
@@ -230,7 +237,7 @@ function openProd(id){
 function custPrice(){const{p,sel}=S.cur;let t=p.price;groupsOf(p.cat).forEach(g=>{const v=optv(p,g);if(GRP[g].m)sel[g].forEach(i=>t+=(v[i]||[0,0])[1]);else t+=(v[sel[g]]||[0,0])[1]});return Math.max(0,Math.round(t*100)/100)}
 function drawCust(){
   const{p,sel}=S.cur;
-  sheet(`<h2>${esc(p.em||'')} ${esc(p.name)}</h2>${groupsOf(p.cat).filter(g=>optv(p,g).length).map(g=>{const m=GRP[g].m;return `<h3>${GRP[g].t}</h3><div class="chips">${optv(p,g).map((x,i)=>{const on=m?sel[g].includes(i):sel[g]===i;return `<button class="chip ${on?'on':''}" data-a="grp" data-g="${g}" data-i="${i}" aria-pressed="${on}">${esc(x[0])}${x[1]?` ${x[1]>0?'+':'−'}${fmt(Math.abs(x[1]))}`:''}</button>`}).join('')}</div>`}).join('')}
+  sheet(`<h2>${p.em?esc(p.em)+' ':''}${esc(p.name)}</h2>${groupsOf(p.cat).filter(g=>optv(p,g).length).map(g=>{const m=GRP[g].m;return `<h3>${GRP[g].t}</h3><div class="chips">${optv(p,g).map((x,i)=>{const on=m?sel[g].includes(i):sel[g]===i;return `<button class="chip ${on?'on':''}" data-a="grp" data-g="${g}" data-i="${i}" aria-pressed="${on}">${esc(x[0])}${x[1]?` ${x[1]>0?'+':'−'}${fmt(Math.abs(x[1]))}`:''}</button>`}).join('')}</div>`}).join('')}
   <div class="stk"><button class="btn" data-a="addc">Add to Order — ${fmt(custPrice())}</button></div>`);
 }
 function addCust(){
@@ -293,20 +300,19 @@ function showReceipt(o,fresh){
 
 /* ============ PRODUCTS ============ */
 const swS='color:var(--tx);font-size:16px;margin:8px 0 0';
+const gs=v=>{v=String(v==null?'':v).trim();if(!v)return [];try{return [...new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(v)].map(x=>x.segment)}catch{return [...v]}};
 const g1=v=>{v=String(v==null?'':v).trim();if(!v)return '';try{const it=new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(v)[Symbol.iterator]().next().value;return it?it.segment:''}catch{return [...v][0]||''}};
-const EMOJIS=['☕','🥛','🍫','🧊','🍵','🫖','🧋','🥤','🍹','🍓','🍋','🍊','🍌','🥭','🍎','🥐','🧁','🍰','🍪','🍩','🍞','🥯','🥞','🧇','🥪','🍳','🍕','🥗','🍥','🍯','🍦','🥜','🌾','➕','🍃','🔥'];
 function optRows(sc,g,v){
   return `<h3>${GRP[g].t}</h3>${v.map((x,i)=>`<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" aria-label="${GRP[g].t} choice name" data-oe="${sc}|${g}|${i}|0" value="${esc(x[0])}" style="flex:1;min-width:0"><input type="number" aria-label="Price" inputmode="decimal" data-oe="${sc}|${g}|${i}|1" value="${x[1]}" style="width:90px"><button class="ib" data-a="oDel" data-sc="${sc}" data-g="${g}" data-i="${i}" aria-label="Remove choice">✕</button></div>`).join('')}<button class="btn sec sm" data-a="oAdd" data-sc="${sc}" data-g="${g}">+ Add choice</button>`;
 }
 function syncPF(){if(!PF||!$('#f1'))return;PF.name=$('#f1').value;PF.em=g1($('#f7').value);PF.cat=$('#f2').value;PF.price=$('#f3').value;PF.desc=$('#f4').value;PF.on=$('#f5').checked}
-function editProd(id){const p=S.products.find(x=>x.id===id);PF=p?{...clone(p),id}:{id:'',name:'',em:'☕',cat:S.cat,price:'',desc:'',on:true,o:null};drawPF(1)}
+function editProd(id){const p=S.products.find(x=>x.id===id);PF=p?{...clone(p),id}:{id:'',name:'',em:'',cat:S.cat,price:'',desc:'',on:true,o:null};drawPF(1)}
 function drawPF(first){
   const p=PF,gs=groupsOf(p.cat);
   if(p.o)gs.forEach(g=>{if(!p.o[g])p.o[g]=clone(S.opts[g])});
   sheet(`<h2>${p.id?'Edit product':'Add product'}</h2>
   <label for="f1">Product name</label><input type="text" id="f1" value="${esc(p.name)}" ${first?'autofocus':''}>
-  <label for="f7">Emoji</label><div style="display:flex;align-items:center;gap:10px"><input type="text" id="f7" aria-label="Product emoji" value="${esc(p.em||'')}" placeholder="☕" autocomplete="off" style="width:76px;text-align:center;font-size:28px;padding:6px"><span style="color:var(--mut);font-size:13px">Type or paste any emoji (your phone's emoji keyboard works), or pick one below.</span></div>
-  <div class="chips" style="margin-top:8px">${EMOJIS.map(e=>`<button type="button" class="chip ${e===p.em?'on':''}" style="min-width:46px;padding:6px 10px;font-size:22px" data-a="pem" data-v="${e}" aria-label="Use ${e}" aria-pressed="${e===p.em}">${e}</button>`).join('')}</div>
+  <label for="f7">Emoji</label><div style="display:flex;align-items:center;gap:10px"><input type="text" id="f7" aria-label="Product emoji" value="${esc(p.em||'')}" autocomplete="off" style="width:76px;flex:none;text-align:center;font-size:28px;padding:6px"><button type="button" class="btn sec sm" data-a="pemx">Remove emoji</button></div>
   <label for="f2">Category</label><select id="f2">${CATS().map(c=>`<option ${c===p.cat?'selected':''}>${esc(c)}</option>`).join('')}</select>
   <label for="f3">Price</label><input type="number" id="f3" inputmode="decimal" min="0" value="${p.price}">
   <label for="f4">Description</label><input type="text" id="f4" value="${esc(p.desc)}">
@@ -317,7 +323,7 @@ function drawPF(first){
 function saveProd(){
   syncPF();const name=PF.name.trim(),price=Math.round(parseFloat(PF.price)*100)/100;
   if(!name||isNaN(price)||price<0)return toast('Enter a name and valid price');
-  const d={name,em:PF.em||'☕',cat:PF.cat,price,desc:PF.desc.trim(),on:PF.on,o:PF.o};
+  const d={name,em:PF.em||'',cat:PF.cat,price,desc:PF.desc.trim(),on:PF.on,o:PF.o};
   if(PF.id)Object.assign(S.products.find(p=>p.id===PF.id),d);else S.products.push({id:'p'+Date.now(),...d});
   persist('products');closeSheet();render();toast('Product saved');
 }
@@ -388,7 +394,7 @@ const A={
   qrpay:()=>{QRB=1;drawQR(0)},qrback:()=>{QRB=null;drawPay()},qradd:()=>$('#qrf').click(),
   qmv:d=>{const x=+d.i,y=x+ +d.d;if(!S.qrs[y])return;[S.qrs[x],S.qrs[y]]=[S.qrs[y],S.qrs[x]];persist('qrs');render()},
   qdel:d=>{const q=S.qrs[+d.i];confirmDlg(`Delete "${q.label}"?`,()=>{S.qrs.splice(+d.i,1);persist('qrs');render();toast('QR code deleted')},'Delete')},
-  pem:d=>{if(!PF)return;syncPF();PF.em=d.v;drawPF()},
+  pemx:()=>{const i=$('#f7');if(!PF||!i)return;i.value='';PF.em='';i.focus()},
   tog:d=>{const p=S.products.find(x=>x.id===d.id);p.on=!p.on;persist('products');render()},
   delp:d=>confirmDlg('Delete this product?',()=>{S.products=S.products.filter(p=>p.id!==d.id);persist('products');render();toast('Product deleted')},'Delete'),
   pickLogo:d=>$('#lg'+d.k).click(),
@@ -399,8 +405,10 @@ const A={
   cmv:d=>{const x=+d.x,y=x+ +d.d;[S.cats[x],S.cats[y]]=[S.cats[y],S.cats[x]];persist('cats');render()},
   cdel:d=>{const c=S.cats[d.x],n=S.products.filter(p=>p.cat===c.n).length;confirmDlg(`Delete "${c.n}"${n?' and its '+n+' product'+(n>1?'s':''):''}?`,()=>{S.products=S.products.filter(p=>p.cat!==c.n);S.cats.splice(d.x,1);persist('products');persist('cats');render();toast('Category deleted')},'Delete')},
   cadd:()=>{const i=$('#nc'),v=i.value.trim();if(!v)return toast('Enter a category name');if(CATS().some(c=>c.toLowerCase()===v.toLowerCase()))return toast('That category already exists');S.cats.push({n:v,g:[]});persist('cats');render();toast('Category added')},
-  dadd:()=>{S.discounts.push({id:'d'+Date.now(),name:'New discount',type:'pct',v:10,scope:'both'});persist('discounts');render()},
-  ddel:d=>{const x=S.discounts[d.x];confirmDlg(`Delete "${x.name}"?`,()=>{S.discounts.splice(d.x,1);persist('discounts');render()},'Delete')},
+  dadd:()=>drawDisc(-1),dedit:d=>drawDisc(+d.i),
+  dsave:d=>{const i=+d.i,n=$('#dn').value.trim(),type=$('#dt').value,v=parseFloat($('#dv').value),scope=$('#ds').value;if(!n||!(v>0)){toast('Enter a name and a value above 0');return}
+    const x={name:n,type,v:type==='pct'?Math.min(100,v):v,scope};if(i>=0)Object.assign(S.discounts[i],x);else S.discounts.push({id:'d'+Date.now(),...x});persist('discounts');closeSheet();render();toast('Discount saved')},
+  ddel:d=>{const x=S.discounts[+d.i];confirmDlg(`Delete "${x.name}"?`,()=>{S.discounts.splice(+d.i,1);persist('discounts');render();toast('Discount deleted')},'Delete')},
   export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined},next:S.next,qrs:S.qrs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
   import:()=>$('#imp').click(),
   clr:()=>confirmDlg('Clear all orders? This cannot be undone.',()=>guard('Clear all orders',()=>{S.orders=[];persist('orders');render();toast('Orders cleared')}),'Clear'),
@@ -410,7 +418,6 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.oe){const[sc,g,i,k]=t.dataset.oe.split('|'),row=oArr(sc,g)[+i];if(k==='0')row[0]=t.value.trim()||row[0];else row[1]=parseFloat(t.value)||0;if(sc==='d')persist('opts')}
-  if(t.dataset.de){const[i,f]=t.dataset.de.split('|'),d=S.discounts[+i];if(f==='name')d.name=t.value.trim()||d.name;else if(f==='type')d.type=t.value;else if(f==='scope')d.scope=t.value;else d.v=Math.max(0,parseFloat(t.value)||0);if(d.type==='pct')d.v=Math.min(100,d.v);persist('discounts');if(f!=='name')render()}
   if(t.dataset.cn!=null){const c=S.cats[+t.dataset.cn],v=t.value.trim();if(!v||S.cats.some(x=>x!==c&&x.n.toLowerCase()===v.toLowerCase())){toast('Name is empty or already used');render();return}S.products.forEach(q=>{if(q.cat===c.n)q.cat=v});if(S.cat===c.n)S.cat=v;c.n=v;persist('cats');persist('products')}
   if(t.id==='f2'&&PF){syncPF();drawPF()}
   if(t.id==='f6'&&PF){syncPF();PF.o=t.checked?{}:null;drawPF()}
@@ -441,13 +448,37 @@ function setLogo(f,k){
     im.onerror=()=>toast('Could not read that image');im.src=rd.result};
   rd.readAsDataURL(f);
 }
+/* ============ DRAG TO REORDER PRODUCTS (mouse, touch, keyboard) ============ */
+let DR=null;
+function reorderProducts(ids){const set=new Set(ids),slots=[],by={};S.products.forEach((p,i)=>{by[p.id]=p;if(set.has(p.id))slots.push(i)});slots.forEach((si,k)=>{S.products[si]=by[ids[k]]});persist('products');const m=$('#main'),y=m.scrollTop;render();m.scrollTop=y;toast('Order saved',1100)}
+function dragUpdate(){const d=DR;if(!d)return;const dy=d.y-d.startY+(d.main.scrollTop-d.mb);d.row.style.transform=`translateY(${dy}px)`;
+  const c=d.tops[d.from]+dy;let to=0;d.tops.forEach((t,j)=>{if(j!==d.from&&t<c)to++});d.to=to;
+  d.rows.forEach((r,j)=>{if(j===d.from)return;let v=0;if(d.from<to&&j>d.from&&j<=to)v=-d.step;else if(d.from>to&&j>=to&&j<d.from)v=d.step;r.style.transform=v?`translateY(${v}px)`:''})}
+function dragScroll(){const d=DR;if(!d||d.raf)return;const tick=()=>{if(DR!==d)return;const r=d.main.getBoundingClientRect();let v=0;if(d.y<r.top+70)v=-12;else if(d.y>r.bottom-70)v=12;if(v){d.main.scrollTop+=v;dragUpdate();d.raf=requestAnimationFrame(tick)}else d.raf=0};d.raf=requestAnimationFrame(tick)}
+document.addEventListener('pointerdown',e=>{const h=e.target.closest&&e.target.closest('[data-drag]');if(!h||DR||(e.pointerType==='mouse'&&e.button!==0))return;
+  const row=h.closest('.row'),box=row.parentElement,rows=[...box.children].filter(r=>r.classList.contains('row')),main=$('#main'),mb=main.scrollTop;
+  const tops=rows.map(r=>{const b=r.getBoundingClientRect();return b.top+b.height/2+mb});
+  DR={row,rows,from:rows.indexOf(row),to:rows.indexOf(row),startY:e.clientY,y:e.clientY,mb,main,tops,id:e.pointerId,raf:0,step:rows.length>1?(tops[rows.length-1]-tops[0])/(rows.length-1):row.offsetHeight};
+  try{h.setPointerCapture(e.pointerId)}catch{}
+  row.classList.add('dragging');rows.forEach(r=>{if(r!==row)r.classList.add('shift')});e.preventDefault()});
+document.addEventListener('pointermove',e=>{if(!DR||e.pointerId!==DR.id)return;DR.y=e.clientY;dragUpdate();dragScroll()});
+const dragEnd=e=>{if(!DR||e.pointerId!==DR.id)return;const d=DR;DR=null;cancelAnimationFrame(d.raf);d.rows.forEach(r=>{r.style.transform='';r.classList.remove('shift','dragging')});
+  if(e.type==='pointerup'&&d.to!==d.from){const ids=d.rows.map(r=>r.dataset.pid),[m]=ids.splice(d.from,1);ids.splice(d.to,0,m);reorderProducts(ids)}};
+document.addEventListener('pointerup',dragEnd);document.addEventListener('pointercancel',dragEnd);
+document.addEventListener('keydown',e=>{const h=e.target.dataset&&e.target.dataset.drag;if(!h||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;e.preventDefault();
+  const row=e.target.closest('.row'),rows=[...row.parentElement.children].filter(r=>r.classList.contains('row')),i=rows.indexOf(row),j=i+(e.key==='ArrowUp'?-1:1);if(j<0||j>=rows.length)return;
+  const ids=rows.map(r=>r.dataset.pid);[ids[i],ids[j]]=[ids[j],ids[i]];reorderProducts(ids);const f=document.querySelector(`[data-drag="${h}"]`);if(f)f.focus()});
+/* ============ DISCOUNTS (list + edit sheet) ============ */
+const dLabel=d=>`${d.type==='pct'?d.v+'% off':fmt(d.v)+' off'} · ${{both:'Items & order',item:'Items',order:'Whole order'}[sc(d)]}`;
+function drawDisc(i){const d=i>=0?S.discounts[i]:{name:'',type:'pct',v:'',scope:'both'};
+  sheet(`<h2>${i>=0?'Edit discount':'New discount'}</h2><label for="dn">Name</label><input type="text" id="dn" maxlength="40" autocomplete="off" value="${esc(d.name)}" ${i<0?'autofocus':''}><label for="dt">Type</label><select id="dt"><option value="pct" ${d.type==='pct'?'selected':''}>Percent (%)</option><option value="amt" ${d.type==='amt'?'selected':''}>Amount (${esc(S.settings.cur)})</option></select><label for="dv">Value</label><input type="number" id="dv" inputmode="decimal" min="0" value="${d.v}"><label for="ds">Applies to</label><select id="ds"><option value="both" ${sc(d)==='both'?'selected':''}>Items and whole order</option><option value="item" ${sc(d)==='item'?'selected':''}>Individual items only</option><option value="order" ${sc(d)==='order'?'selected':''}>Whole order only</option></select><div style="display:grid;gap:8px;margin-top:18px"><button class="btn" data-a="dsave" data-i="${i}">Save</button>${i>=0?`<button class="btn sec" style="color:var(--bad)" data-a="ddel" data-i="${i}">Delete discount</button>`:''}</div>`)}
 /* ============ PAYMENT QR CODES ============ */
 const QR_MAX=6;
 function drawQR(i){
   const L=S.qrs,back=QRB?'<button class="btn sec" style="margin-top:14px" data-a="qrback">Back to payment</button>':'';
   if(!L.length){sheet(`<div class="empty"><div class="em">📱</div>No QR codes yet.<br>Add them in More → QR codes.</div><button class="btn" data-a="qrgo">Add QR codes</button>${back}`);return}
   i=Math.min(Math.max(+i||0,0),L.length-1);const q=L[i];
-  sheet(`<h2 style="text-align:center;margin:6px 0 10px">${esc(q.label)}</h2><div style="background:#fff;border-radius:18px;padding:12px;margin:0 auto;max-width:360px"><img src="${q.src}" alt="${esc(q.label)} QR code" style="display:block;width:100%;max-height:58vh;object-fit:contain;margin:0 auto"></div>${L.length>1?`<div class="chips" style="justify-content:center;margin-top:14px">${L.map((x,k)=>`<button class="chip ${k===i?'on':''}" data-a="qrv" data-i="${k}" aria-pressed="${k===i}">${esc(x.label)}</button>`).join('')}</div>`:''}${back}`);
+  sheet(`<div style="background:#fff;border-radius:18px;padding:12px;margin:40px auto 0;max-width:360px"><img src="${q.src}" alt="${esc(q.label)} QR code" style="display:block;width:100%;max-height:58vh;object-fit:contain;margin:0 auto"></div>${L.length>1?`<div class="chips" style="justify-content:center;margin-top:14px">${L.map((x,k)=>`<button class="chip ${k===i?'on':''}" data-a="qrv" data-i="${k}" aria-pressed="${k===i}">${esc(x.label)}</button>`).join('')}</div>`:''}${back}`);
 }
 function prepQR(f){return new Promise((res,rej)=>{const rd=new FileReader();rd.onerror=rej;rd.onload=()=>{const im=new Image();im.onerror=rej;im.onload=()=>{
   let out='';for(const mx of [1600,1200,900,600]){const k=Math.min(1,mx/Math.max(im.width,im.height)),w=Math.max(1,Math.round(im.width*k)),h=Math.max(1,Math.round(im.height*k)),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);
@@ -463,7 +494,7 @@ async function addQRs(files){
 /* ============ BACKUP IMPORT ============ */
 const storeKB=()=>{let n=0;for(const k of Object.keys(localStorage))if(k.startsWith('bb_'))n+=k.length+(localStorage.getItem(k)||'').length;return Math.round(n/1024)};
 const nm=(v,d=0)=>{v=+v;return isFinite(v)?v:d},tx=(v,n=80)=>String(v==null?'':v).slice(0,n);
-const cleanOpts=o=>{const r={};Object.keys(GRP).forEach(g=>{if(o&&Array.isArray(o[g]))r[g]=o[g].filter(x=>Array.isArray(x)&&tx(x[0],40).trim()).map(x=>[tx(x[0],40).trim(),nm(x[1])])});return r};
+const cleanOpts=o=>{const r={};Object.keys(GRP).forEach(g=>{if(o&&Array.isArray(o[g]))r[g]=o[g].filter(x=>Array.isArray(x)&&tx(x[0],40).trim()).map(x=>[tx(x[0],40).trim(),nm(x[1])])});return migSz(r)};
 function cleanImport(j){
   if(!j||typeof j!=='object'||!Array.isArray(j.products)||!Array.isArray(j.orders))throw new Error('bad');
   const seen=new Set(),products=j.products.filter(x=>x&&tx(x.name).trim()).map((x,i)=>{let id=tx(x.id,30).replace(/[^\w-]/g,'')||'p'+i;while(seen.has(id))id+='x';seen.add(id);
@@ -505,6 +536,9 @@ window.addEventListener('storage',e=>{
 let _day=day(Date.now());const dayTick=()=>{const d=day(Date.now());if(d!==_day){_day=d;if(S.view==='orders'||S.view==='dash')render()}};
 setInterval(dayTick,20000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)dayTick()});
 if(navigator.storage&&navigator.storage.persist)navigator.storage.persist().catch(()=>{});
+/* one-character emoji box: keeps only the last thing typed/picked, selects on focus so typing replaces it */
+document.addEventListener('input',e=>{const t=e.target;if(t.id!=='f7')return;const a=gs(t.value);if(a.length>1){const ins=e.data?gs(e.data):[];t.value=ins.length?ins[0]:a[0]}});
+document.addEventListener('focusin',e=>{if(e.target.id==='f7')setTimeout(()=>e.target.select(),0)});
 /* ============ PWA ============ */
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();IP=e;if(S.view==='more'&&!S.sub)render()});
 window.addEventListener('appinstalled',()=>{IP=null;toast('App installed');if(S.view==='more'&&!S.sub)render()});
