@@ -2,7 +2,7 @@
    Sales data lives in the device's localStorage and is never touched here.
    Bump VERSION when you change icons or the manifest. index.html updates itself
    (it is re-fetched in the background on every launch). */
-const VERSION = 'oras-pos-v1';
+const VERSION = 'oras-pos-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './favicon.ico',
   './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png', './icons/favicon-16.png'];

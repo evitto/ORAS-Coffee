@@ -94,7 +94,7 @@ input[type=text],input[type=number],select{width:100%;min-height:48px;border-rad
 @page{margin:0}
 #prn{position:absolute;left:-9999px;top:0;visibility:hidden;width:48mm;padding:3mm 0 6mm;font-size:11px;line-height:1.35;color:#000;background:#fff;text-align:center}
 #prn *{color:#000!important;border-color:#000!important}
-#prn .ok,#prn h2{display:none!important}
+#prn .ok,#prn h2,#prn .st{display:none!important}
 #prn img{width:16mm!important;height:16mm!important;filter:grayscale(1) contrast(1.6)}
 #prn .l{display:flex;justify-content:space-between;text-align:left;padding:2px 0}
 @media print{html,body{height:auto!important;background:#fff!important;overflow:visible!important}#app,#ov,#toast{display:none!important}#prn{position:static;visibility:visible;margin:0 auto}}
@@ -128,6 +128,7 @@ const SEED=[['Coffee','Espresso',90,'Double shot','☕'],['Coffee','Americano',1
 ['Add-ons','Extra Shot',40,'Espresso shot','➕'],['Add-ons','Oat Milk',40,'Dairy-free','🌾'],['Add-ons','Vanilla Syrup',30,'Sweet pump','🍯'],['Add-ons','Caramel Syrup',30,'Sweet pump','🍯']];
 const OPT={size:[['S',0],['M',20],['L',40]],temp:[['Hot',0],['Iced',0]],milk:[['Regular',0],['Oat',40],['Soy',30]],extras:[['Extra Shot',40],['Vanilla',30],['Caramel',30]]};
 const GRP={size:{t:'Size',m:0},temp:{t:'Temperature',m:0},milk:{t:'Milk',m:0},extras:{t:'Extras',m:1}};
+const DEFDISC=[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}];
 const DEFCATS=[{n:'Coffee',g:['size','temp','milk','extras']},{n:'Non-Coffee',g:['size','temp','milk']},{n:'Tea',g:['size','temp']},{n:'Pastries',g:[]},{n:'Add-ons',g:[]}];
 const clone=o=>JSON.parse(JSON.stringify(o));
 
@@ -141,7 +142,7 @@ const migSz=o=>{const z=o&&o.size;if(Array.isArray(z)&&z.length===3&&z[0]&&z[1]&
 let S={
   products:LS.get('products',null)||SEED.map((s,i)=>({id:'p'+i,cat:s[0],name:s[1],price:s[2],desc:s[3],em:s[4],on:true})),
   orders:LS.get('orders',[]),opts:migSz(LS.get('opts',null)||clone(OPT)),cats:LS.get('cats',null)||clone(DEFCATS),settings:mkSettings(LS.get('settings',{})),
-  cart:LS.get('cart',{items:[],dc:null}),qrs:LS.get('qrs',[]),discounts:LS.get('discounts',null)||[{id:'d1',name:'Senior / PWD',type:'pct',v:20},{id:'d2',name:'Staff',type:'pct',v:10},{id:'d3',name:'Loyalty',type:'pct',v:5}],next:LS.get('next',1001),
+  cart:LS.get('cart',{items:[],dc:null}),qrs:LS.get('qrs',[]),discounts:LS.get('discounts',null)||clone(DEFDISC),next:LS.get('next',1001),
   view:'pos',sub:null,cat:'Coffee',cur:null,pay:{m:'Cash',r:''}
 };
 const persist=k=>{if(window._rl)return;if(!LS.set(k,k==='settings'?S.settings:S[k]))toast('⚠ Storage full – not saved! Export your data, then clear orders.',6000)};
@@ -161,7 +162,7 @@ const tm=t=>new Date(t).toLocaleTimeString('en-PH',{hour:'numeric',minute:'2-dig
 const day=t=>new Date(t).toDateString();
 const today=()=>S.orders.filter(o=>day(o.t)===day(Date.now()));
 const sc=d=>d.scope||'both';
-const dAmt=(x,b)=>!x?0:Math.round((x.type==='pct'?Math.round(b*x.v)/100:Math.min(b,x.v))*100)/100;
+const dAmt=(x,b)=>!x?0:Math.round((x.type==='pct'?Math.round(b*x.v+1e-7)/100:Math.min(b,x.v))*100)/100;
 const sums=c=>{
   const lines=c.items.map(i=>{const g=Math.round(i.unit*i.qty*100)/100,x=S.discounts.find(q=>q.id===i.dc),ok=x&&sc(x)!=='order';return{g,d:ok?dAmt(x,g):0,n:ok?x.name:''}});
   const sub=Math.round(lines.reduce((a,l)=>a+l.g,0)*100)/100,di=Math.round(lines.reduce((a,l)=>a+l.d,0)*100)/100;
@@ -197,7 +198,7 @@ function vPos(){
   if(!S.cats.some(c=>c.n===S.cat))S.cat=(S.cats[0]||{}).n;
   const ps=S.products.filter(p=>p.cat===S.cat);
   return `<div class="tabs" role="tablist">${CATS().map(c=>`<button class="tab ${c===S.cat?'on':''}" role="tab" aria-selected="${c===S.cat}" data-a="cat" data-v="${esc(c)}">${esc(c)}</button>`).join('')}</div>
-  ${ps.length?`<div class="grid">${ps.map(p=>`<button class="pc ${p.on?'':'off'}" data-a="prod" data-id="${p.id}" aria-label="${esc(p.name)} ${fmt(p.price)}${p.on?'':' unavailable'}">${p.em?`<span class="em">${esc(p.em)}</span>`:''}<b>${esc(p.name)}</b><small>${p.on?esc(p.desc):'Unavailable today'}</small><span class="pr">${fmt(p.price)}</span></button>`).join('')}</div>`:'<div class="empty"><div class="em">☕</div>No products here yet.<br>Add some under More → Products.</div>'}`;
+  ${ps.length?`<div class="grid">${ps.map(p=>`<button class="pc ${p.on?'':'off'}" data-a="prod" data-id="${p.id}" aria-label="${esc(p.name)} ${fmt(p.price)}${p.on?'':' unavailable'}">${p.em?`<span class="em">${esc(p.em)}</span>`:''}<b>${esc(p.name)}</b><small>${p.on?esc(p.desc):'Unavailable today'}</small><span class="pr">${fmt(p.price)}</span></button>`).join('')}</div>`:`<div class="empty"><div class="em">☕</div>${S.cats.length?'No products here yet.<br>Add some under More → Products.':'Nothing here yet.<br>Add a category under More → Categories, then your products.<br>Or load a ready-made menu in More → Settings → Add sample data.'}</div>`}`;
 }
 const orow=o=>{const st=o.voided?'v':o.void?'c':o.done?'ok':'';return `<div class="row os ${st?'s-'+st:''}"><button class="ob" data-a="ord" data-id="${o.no}"><b>#${o.no}</b><span class="g"><small style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${o.cust?`<b style="color:var(--tx);font-weight:600;display:inline-block;max-width:9em;overflow:hidden;text-overflow:ellipsis;vertical-align:bottom">${esc(o.cust)}</b> · `:''}${tm(o.t)} · ${esc(o.method)}${o.voided?' · <span style="color:var(--bad)">Voided</span>':o.void?' · <span style="color:var(--bad)">Cancelled</span>':''}</small></span><b style="${o.void||o.voided?'text-decoration:line-through;color:var(--mut)':''}">${fmt(o.total)}</b></button>${st==='v'||st==='c'?'':`<button class="ck ${o.done?'on':''}" data-a="mdone" data-id="${o.no}" aria-pressed="${!!o.done}" aria-label="${o.done?'Mark order #'+o.no+' as not complete':'Mark order #'+o.no+' as complete'}">✓</button>`}</div>`};
 function vOrders(){const o=today().slice().reverse();return `<h2>Today's orders</h2>${o.length?`<div class="lst">${o.map(orow).join('')}</div>`:'<div class="empty"><div class="em">🧾</div>No orders yet today.<br>Completed orders will show up here.</div>'}`}
@@ -215,14 +216,14 @@ function vMore(){
   if(S.sub==='cats')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Categories</h2></div><p style="color:var(--mut)">Add or reorder categories and choose which options each one offers.</p><div class="lst">${S.cats.map((c,x)=>{const n=S.products.filter(p=>p.cat===c.n).length;return `<div class="pd"><div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" aria-label="Category name" data-cn="${x}" value="${esc(c.n)}" style="flex:1"><button class="ib" data-a="cmv" data-x="${x}" data-d="-1" ${x?'':'disabled'} aria-label="Move up">↑</button><button class="ib" data-a="cmv" data-x="${x}" data-d="1" ${x<S.cats.length-1?'':'disabled'} aria-label="Move down">↓</button><button class="ib" data-a="cdel" data-x="${x}" ${S.cats.length>1?'':'disabled'} aria-label="Delete category">🗑</button></div><small style="color:var(--mut)">${n} product${n==1?'':'s'} · options offered:</small><div class="chips" style="margin-top:6px">${Object.keys(GRP).map(g=>`<button class="chip ${c.g.includes(g)?'on':''}" data-a="cg" data-x="${x}" data-g="${g}" aria-pressed="${c.g.includes(g)}">${GRP[g].t}</button>`).join('')}</div></div>`}).join('')}</div><h3>New category</h3><div style="display:flex;gap:8px"><input type="text" id="nc" aria-label="New category name" placeholder="e.g. Sandwiches" style="flex:1"><button class="btn sm" data-a="cadd">Add</button></div>`;
   if(S.sub==='opts')return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Option prices</h2></div><p style="color:var(--mut);margin:0 0 4px">Default choices and extra charges. Every product uses these unless you set custom prices in its product form. Use 0 for no charge.</p>${Object.keys(GRP).map(g=>optRows('d',g,S.opts[g])).join('')}`;
   if(S.sub==='products'){const gr=S.cats.map(c=>({n:c.n,ps:S.products.filter(p=>p.cat===c.n)})).filter(g=>g.ps.length);
-    return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Products</h2><button class="btn sm" data-a="editp" data-id="">+ Add</button></div><p style="color:var(--mut);margin:10px 0 0">Drag <b>⠿</b> to reorder. This is the order shown on the POS.</p>${gr.map(g=>`<div class="gh"><span>${esc(g.n)}</span><span>${g.ps.length}</span></div><div class="lst">${g.ps.map(p=>`<div class="row" data-pid="${p.id}"><button class="dh" data-drag="${p.id}" aria-label="Reorder ${esc(p.name)}">⠿</button><button class="g" style="text-align:left" data-a="editp" data-id="${p.id}"><b>${p.em?esc(p.em)+' ':''}${esc(p.name)}</b><small>${fmt(p.price)}${p.on?'':' · Unavailable'}</small></button><button class="ib" data-a="tog" data-id="${p.id}" aria-label="Toggle availability">${p.on?'✅':'⛔'}</button></div>`).join('')}</div>`).join('')}`}
+    return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0;flex:1">Products</h2><button class="btn sm" data-a="editp" data-id="">+ Add</button></div><p style="color:var(--mut);margin:10px 0 0">Drag <b>⠿</b> to reorder. This is the order shown on the POS.</p>${gr.length?'':'<div class="empty">No products yet.<br>Tap + Add to create one.</div>'}${gr.map(g=>`<div class="gh"><span>${esc(g.n)}</span><span>${g.ps.length}</span></div><div class="lst">${g.ps.map(p=>`<div class="row" data-pid="${p.id}"><button class="dh" data-drag="${p.id}" aria-label="Reorder ${esc(p.name)}">⠿</button><button class="g" style="text-align:left" data-a="editp" data-id="${p.id}"><b>${p.em?esc(p.em)+' ':''}${esc(p.name)}</b><small>${fmt(p.price)}${p.on?'':' · Unavailable'}</small></button><button class="ib" data-a="tog" data-id="${p.id}" aria-label="Toggle availability">${p.on?'✅':'⛔'}</button></div>`).join('')}</div>`).join('')}`}
   if(S.sub==='settings'){const sw=(k,t)=>`<label class="sw" style="margin:0;color:var(--tx);font-size:16px">${t}<input type="checkbox" data-s="${k}" ${s[k]?'checked':''}></label>`;
     return `<div style="display:flex;align-items:center;gap:8px"><button class="ib" data-a="sub" data-v="" aria-label="Back">←</button><h2 style="margin:0">Settings</h2></div>
     <h3>Shop</h3><label for="s1">Shop name</label><input type="text" id="s1" data-s="shop" value="${esc(s.shop)}"><div style="display:grid;gap:12px;margin-top:6px">${logoBox('L','Logo · light mode','#F8F7F4')}${logoBox('D','Logo · dark mode','#1c1b19')}</div><p style="color:var(--mut);font-size:13px;margin:8px 0 0">Shown in the header. With only one uploaded, it's used for both modes. Receipts print the light logo.</p><label for="s2">Currency symbol</label><input type="text" id="s2" data-s="cur" value="${esc(s.cur)}" maxlength="3">
     <h3>Receipt</h3>${sw('rShop','Show shop name')}${sw('rNo','Show order number')}${sw('rPay','Show payment method')}
     <h3>Appearance</h3>${sw('dark','Dark mode')}
     <h3>Security</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="setpin">${s.pin?'Change void passcode':'Set void passcode'}</button>${s.pin?'<button class="btn sec" data-a="rmpin">Remove void passcode</button>':''}</div><small style="color:var(--mut);display:block;margin-top:6px">A 4-digit passcode is required to void an order or restore a voided one.</small>
-    <h3>Data</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="export">Export data</button><button class="btn sec" data-a="import">Import data</button><input type="file" id="imp" accept="application/json,.json" data-a2="imp" hidden><button class="btn sec" data-a="clr">Clear orders</button><button class="btn bad" data-a="reset">Reset POS</button></div>${(()=>{const kb=storeKB();return `<small style="display:block;margin-top:8px;color:${kb>4000?'var(--bad)':'var(--mut)'}">Storage used: about ${kb.toLocaleString('en-PH')} KB of ~5,000 KB${kb>4000?' — almost full! Export, then clear orders.':''}</small>`})()}`}
+    <h3>Data</h3><div style="display:grid;gap:8px"><button class="btn sec" data-a="export">Export data</button><button class="btn sec" data-a="import">Import data</button><input type="file" id="imp" accept="application/json,.json" data-a2="imp" hidden><button class="btn sec" data-a="clr">Clear orders</button><button class="btn sec" data-a="sample">Add sample data</button><button class="btn bad" data-a="wipe">Clear all data</button></div>${(()=>{const kb=storeKB();return `<small style="display:block;margin-top:8px;color:${kb>4000?'var(--bad)':'var(--mut)'}">Storage used: about ${kb.toLocaleString('en-PH')} KB of ~5,000 KB${kb>4000?' — almost full! Export, then clear orders.':''}</small>`})()}`}
   return `<h2>More</h2><div class="lst">${IP?'<button class="row" data-a="install"><span class="g"><b>📲 Install app</b><small>Add ORAS POS to your home screen</small></span>›</button>':''}<button class="row" data-a="sub" data-v="products"><span class="g"><b>☕ Products</b><small>Add, edit, set prices and availability</small></span>›</button><button class="row" data-a="sub" data-v="cats"><span class="g"><b>🗂 Categories</b><small>Add, rename, reorder</small></span>›</button><button class="row" data-a="sub" data-v="qr"><span class="g"><b>📱 QR codes</b><small>Payment QR codes to show customers</small></span>›</button><button class="row" data-a="sub" data-v="disc"><span class="g"><b>🏷 Discounts</b><small>Percent or fixed-amount discounts</small></span>›</button><button class="row" data-a="sub" data-v="opts"><span class="g"><b>💲 Option prices</b><small>Sizes, hot/iced, milks, extras</small></span>›</button><button class="row" data-a="sub" data-v="settings"><span class="g"><b>⚙️ Settings</b><small>Shop, receipt, appearance, data</small></span>›</button></div>`;
 }
 
@@ -290,7 +291,7 @@ function complete(){
 }
 function showReceipt(o,fresh){
   const s=S.settings;
-  sheet(`<div id="receipt">${fresh?'<div class="ok">✓</div><h2>Payment Complete</h2>':'<h2>Order details</h2>'+(o.voided?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Voided at '+tm(o.voided)+'</div>':o.void?'<div style="color:var(--bad);font-weight:700;margin-bottom:6px">Cancelled at '+tm(o.void)+'</div>':o.done?'<div style="color:var(--ok);font-weight:700;margin-bottom:6px">Completed at '+tm(o.done)+'</div>':'')}
+  sheet(`<div id="receipt">${fresh?'<div class="ok">✓</div><h2>Payment Complete</h2>':'<h2>Order details</h2>'+(o.voided?'<div class="st" style="color:var(--bad);font-weight:700;margin-bottom:6px">Voided at '+tm(o.voided)+'</div>':o.void?'<div class="st" style="color:var(--bad);font-weight:700;margin-bottom:6px">Cancelled at '+tm(o.void)+'</div>':o.done?'<div class="st" style="color:var(--ok);font-weight:700;margin-bottom:6px">Completed at '+tm(o.done)+'</div>':'')}
   ${s.rShop&&logoFor(s.dark)?`<img src="${logoFor(s.dark)}" alt="" style="width:56px;height:56px;border-radius:12px;object-fit:cover;display:block;margin:0 auto 6px">`:''}${s.rShop?`<div style="font-weight:700">${esc(s.shop)}</div>`:''}<div style="color:var(--mut);margin-bottom:10px">${s.rNo?'Order #'+o.no+' · ':''}${new Date(o.t).toLocaleDateString('en-PH')} ${tm(o.t)}${o.cust?`<br><span style="color:var(--tx)">Customer: <b>${esc(o.cust)}</b></span>`:''}</div>
   <div style="border-top:1px dashed var(--bd);border-bottom:1px dashed var(--bd);padding:8px 0;margin-bottom:8px">${o.items.map(i=>`<div class="l"><span>${esc(i.name)} × ${i.qty}${i.opts.length?`<small style="display:block;color:var(--mut)">${esc(i.opts.join(', '))}</small>`:''}${i.dd?`<small style="display:block;color:var(--mut)">${esc(i.dn)} −${fmt(i.dd)}</small>`:''}</span><span>${fmt(i.unit*i.qty)}</span></div>`).join('')}</div>
   ${o.disc?`<div class="l"><span>Subtotal</span><span>${fmt(o.sub)}</span></div>`:''}${o.di?`<div class="l"><span>Item discounts</span><span>−${fmt(o.di)}</span></div>`:''}${(o.di===undefined?o.disc:o.dor)?`<div class="l"><span>${o.di===undefined?'Discount':'Order discount'}${o.dname?' ('+esc(o.dname)+')':''}</span><span>−${fmt(o.di===undefined?o.disc:o.dor)}</span></div>`:''}<div class="l" style="font-size:20px"><b>Total</b><b>${fmt(o.total)}</b></div>
@@ -306,7 +307,8 @@ function optRows(sc,g,v){
   return `<h3>${GRP[g].t}</h3>${v.map((x,i)=>`<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" aria-label="${GRP[g].t} choice name" data-oe="${sc}|${g}|${i}|0" value="${esc(x[0])}" style="flex:1;min-width:0"><input type="number" aria-label="Price" inputmode="decimal" data-oe="${sc}|${g}|${i}|1" value="${x[1]}" style="width:90px"><button class="ib" data-a="oDel" data-sc="${sc}" data-g="${g}" data-i="${i}" aria-label="Remove choice">✕</button></div>`).join('')}<button class="btn sec sm" data-a="oAdd" data-sc="${sc}" data-g="${g}">+ Add choice</button>`;
 }
 function syncPF(){if(!PF||!$('#f1'))return;PF.name=$('#f1').value;PF.em=g1($('#f7').value);PF.cat=$('#f2').value;PF.price=$('#f3').value;PF.desc=$('#f4').value;PF.on=$('#f5').checked}
-function editProd(id){const p=S.products.find(x=>x.id===id);PF=p?{...clone(p),id}:{id:'',name:'',em:'',cat:S.cat,price:'',desc:'',on:true,o:null};drawPF(1)}
+function editProd(id){if(!id&&!S.cats.length){toast('Add a category first (More → Categories)',2500);return}
+  const p=S.products.find(x=>x.id===id);PF=p?{...clone(p),id}:{id:'',name:'',em:'',cat:S.cat,price:'',desc:'',on:true,o:null};drawPF(1)}
 function drawPF(first){
   const p=PF,gs=groupsOf(p.cat);
   if(p.o)gs.forEach(g=>{if(!p.o[g])p.o[g]=clone(S.opts[g])});
@@ -358,7 +360,7 @@ const A={
   prod:d=>openProd(d.id),
   grp:d=>{const{sel,p}=S.cur,g=d.g,i=+d.i;if(GRP[g].m){const k=sel[g].indexOf(i);k<0?sel[g].push(i):sel[g].splice(k,1)}else sel[g]=i;drawCust()},
   addc:addCust,cart:drawCart,close:closeSheet,
-  cfok:()=>{const f=window._cf;closeSheet();f&&f()},
+  cfok:()=>{const f=window._cf;window._cf=null;closeSheet();f&&f()},
   q:d=>{const i=S.cart.items[d.x];i.qty+=+d.d;if(i.qty<1)S.cart.items.splice(d.x,1);persist('cart');drawCart();renderBar()},
   rm:d=>{S.cart.items.splice(d.x,1);persist('cart');drawCart();renderBar()},
   co:()=>{S.pay={m:'Cash',r:'',c:''};drawName()},
@@ -366,8 +368,8 @@ const A={
   nameok:()=>{const i=$('#cn1');S.pay.c=i?i.value.trim().replace(/\s+/g,' '):'';drawPay()},
   nameskip:()=>{S.pay.c='';drawPay()},
   pm:d=>{S.pay.m=d.v;drawPay()},
-  quick:d=>{S.pay.r=String(d.v);drawPay()},
-  key:d=>{let r=S.pay.r;if(d.v==='⌫')r=r.slice(0,-1);else if(r.length<7)r=(r+d.v).replace(/^0+(?=\d)/,'');S.pay.r=r;drawPay()},
+  quick:d=>{S.pay.r=String(d.v);S.pay.x=1;drawPay()},
+  key:d=>{let r=S.pay.r;if(S.pay.x){S.pay.x=0;if(d.v!=='⌫')r=''}if(d.v==='⌫')r=r.slice(0,-1);else if(r.length<7)r=(r+d.v).replace(/^0+(?=\d)/,'');S.pay.r=r;drawPay()},
   done:complete,
   newo:()=>{closeSheet();S.view='pos';render()},
   print:()=>{const r=$('#receipt');if(!r)return window.print();
@@ -409,10 +411,15 @@ const A={
   dsave:d=>{const i=+d.i,n=$('#dn').value.trim(),type=$('#dt').value,v=parseFloat($('#dv').value),scope=$('#ds').value;if(!n||!(v>0)){toast('Enter a name and a value above 0');return}
     const x={name:n,type,v:type==='pct'?Math.min(100,v):v,scope};if(i>=0)Object.assign(S.discounts[i],x);else S.discounts.push({id:'d'+Date.now(),...x});persist('discounts');closeSheet();render();toast('Discount saved')},
   ddel:d=>{const x=S.discounts[+d.i];confirmDlg(`Delete "${x.name}"?`,()=>{S.discounts.splice(+d.i,1);persist('discounts');render();toast('Discount deleted')},'Delete')},
-  export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined},next:S.next,qrs:S.qrs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date().toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
+  export:()=>{const b=new Blob([JSON.stringify({products:S.products,categories:S.cats,optionPrices:S.opts,discounts:S.discounts,orders:S.orders,settings:{...S.settings,pin:undefined},next:S.next,qrs:S.qrs},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='oras-coffee-'+new Date(Date.now()+288e5).toISOString().slice(0,10)+'.json';a.click();toast('Data exported')},
   import:()=>$('#imp').click(),
   clr:()=>confirmDlg('Clear all orders? This cannot be undone.',()=>guard('Clear all orders',()=>{S.orders=[];persist('orders');render();toast('Orders cleared')}),'Clear'),
-  reset:()=>confirmDlg('Reset the POS? Products, orders and settings will be erased.',()=>guard('Reset POS',()=>{Object.keys(localStorage).filter(k=>k.startsWith('bb_')).forEach(k=>localStorage.removeItem(k));location.reload()}),'Reset')
+  sample:()=>confirmDlg('Add the sample menu? This replaces your current products, categories, discounts and option prices with the sample ones. Orders, QR codes and settings are kept.',()=>guard('Add sample data',()=>{
+    S.products=SEED.map((x,k)=>({id:'p'+k,cat:x[0],name:x[1],price:x[2],desc:x[3],em:x[4],on:true}));S.cats=clone(DEFCATS);S.opts=clone(OPT);S.discounts=clone(DEFDISC);S.cat=S.cats[0].n;
+    ['products','cats','opts','discounts'].forEach(persist);render();toast('Sample data added')}),'Add sample'),
+  wipe:()=>confirmDlg('Clear ALL data for a clean start? Products, categories, discounts, QR codes and all orders will be erased, and order numbers restart at #1001. Your shop name, logos, passcode and receipt settings are kept. This cannot be undone.',()=>guard('Clear all data',()=>{
+    Object.assign(S,{products:[],cats:[],discounts:[],orders:[],qrs:[],next:1001,cart:{items:[],dc:null},opts:clone(OPT),cat:''});
+    ['products','cats','discounts','orders','qrs','next','cart','opts'].forEach(persist);S.view='more';S.sub=null;render();toast('All data cleared')}),'Clear all data')
 };
 document.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(t&&A[t.dataset.a])A[t.dataset.a](t.dataset)});
 document.addEventListener('change',e=>{
